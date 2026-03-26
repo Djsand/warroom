@@ -14,8 +14,8 @@ export function loadConfig(): GapsConfig {
 
   return {
     auth,
-    architectModel: process.env.GAPS_ARCHITECT_MODEL ?? "claude-sonnet-4-6-20250514",
-    agentModel: process.env.GAPS_AGENT_MODEL ?? "claude-sonnet-4-6-20250514",
+    architectModel: process.env.GAPS_ARCHITECT_MODEL ?? "claude-sonnet-4-6",
+    agentModel: process.env.GAPS_AGENT_MODEL ?? "claude-sonnet-4-6",
     maxDesignRounds: Number(process.env.GAPS_MAX_DESIGN_ROUNDS ?? 4),
     maxReviewRounds: Number(process.env.GAPS_MAX_REVIEW_ROUNDS ?? 3),
     outputDir: ".gaps",

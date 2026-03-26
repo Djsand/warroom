@@ -5,7 +5,7 @@ export function renderSummary(thread: Thread, branchName: string): string {
   const lines: string[] = [];
   const stats = thread.getStats();
 
-  lines.push(`# gaps summary — "${thread.task}"`);
+  lines.push(`# warroom summary — "${thread.task}"`);
   lines.push("");
 
   lines.push("## Result: COMPLETE");

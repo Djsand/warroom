@@ -32,7 +32,7 @@ describe("runGaps", () => {
     expect(result.task).toBe("Add auth");
     expect(result.messages.length).toBeGreaterThan(0);
     expect(result.stats.totalMessages).toBeGreaterThan(0);
-    expect(result.conversationMd).toContain("gaps conversation");
-    expect(result.summaryMd).toContain("gaps summary");
+    expect(result.conversationMd).toContain("warroom conversation");
+    expect(result.summaryMd).toContain("warroom summary");
   });
 });

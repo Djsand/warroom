@@ -32,7 +32,7 @@ export async function handleRun(task: string): Promise<void> {
     }
   }
 
-  console.log(chalk.bold.green("gaps starting..."));
+  console.log(chalk.bold.green("warroom starting..."));
   console.log(chalk.dim(`Task:        ${task}`));
   console.log(chalk.dim(`Project dir: ${projectDir}`));
 
@@ -47,9 +47,9 @@ export async function handleRun(task: string): Promise<void> {
     maxReviewRounds: config.maxReviewRounds,
   });
 
-  // Write conversation.md and summary.md to .gaps/conversations/<slug>/
+  // Write conversation.md and summary.md to .warroom/conversations/<slug>/
   const slug = `${slugify(task)}-${formatDate(result.startedAt)}`;
-  const convDir = path.join(projectDir, ".gaps", "conversations", slug);
+  const convDir = path.join(projectDir, ".warroom", "conversations", slug);
   fs.mkdirSync(convDir, { recursive: true });
 
   const conversationPath = path.join(convDir, "conversation.md");

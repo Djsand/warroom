@@ -5,7 +5,7 @@ import type { GapsConfig, GapsAuth } from "./types.js";
  * Resolve auth. Checks in order:
  * 1. ANTHROPIC_API_KEY env var
  * 2. CLAUDE_CODE_OAUTH_TOKEN env var
- * 3. ~/.gaps/credentials.json (from `gaps setup`)
+ * 3. ~/.warroom/credentials.json (from `warroom setup`)
  *
  * All tokens are sent as X-Api-Key (same as OpenClaw).
  */
@@ -18,7 +18,7 @@ export function loadConfig(): GapsConfig {
     agentModel: process.env.GAPS_AGENT_MODEL ?? "claude-sonnet-4-6",
     maxDesignRounds: Number(process.env.GAPS_MAX_DESIGN_ROUNDS ?? 4),
     maxReviewRounds: Number(process.env.GAPS_MAX_REVIEW_ROUNDS ?? 3),
-    outputDir: ".gaps",
+    outputDir: ".warroom",
   };
 }
 
@@ -35,7 +35,7 @@ function resolveAuth(): GapsAuth {
     return { method: "api-key", token: oauthToken };
   }
 
-  // 3. Stored credentials from `gaps setup`
+  // 3. Stored credentials from `warroom setup`
   const storedKey = resolveStoredApiKey();
   if (storedKey) {
     return { method: "api-key", token: storedKey };
@@ -43,9 +43,9 @@ function resolveAuth(): GapsAuth {
 
   throw new Error(
     "No authentication found. Set up with one of:\n\n" +
-    "  1. gaps setup --token <token>   (paste from `claude setup-token`)\n" +
-    "  2. gaps setup --login           (browser OAuth)\n" +
-    "  3. export ANTHROPIC_API_KEY=... (API key)\n\n" +
-    "Run `gaps setup` for options."
+    "  1. warroom setup --token <token>   (paste from `claude setup-token`)\n" +
+    "  2. warroom setup --login           (browser OAuth)\n" +
+    "  3. export ANTHROPIC_API_KEY=...    (API key)\n\n" +
+    "Run `warroom setup` for options."
   );
 }

@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.gaps/
+.warroom/
 *.env
 .env
 *.tgz

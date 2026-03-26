@@ -7,8 +7,8 @@ describe("renderSummary", () => {
     const thread = new Thread("Add user auth");
     thread.add({ role: "architect", content: "Design done", phase: "design" });
 
-    const md = renderSummary(thread, "gaps/add-auth");
-    expect(md).toContain("# gaps summary");
+    const md = renderSummary(thread, "warroom/add-auth");
+    expect(md).toContain("# warroom summary");
     expect(md).toContain("Add user auth");
     expect(md).toContain("COMPLETE");
   });
@@ -24,14 +24,14 @@ describe("renderSummary", () => {
       codeChanges: [{ filePath: "src/auth.ts", content: "code", action: "create" }],
     });
 
-    const md = renderSummary(thread, "gaps/add-auth");
+    const md = renderSummary(thread, "warroom/add-auth");
     expect(md).toContain("3 messages");
     expect(md).toContain("1 files changed");
   });
 
   it("includes branch name", () => {
     const thread = new Thread("Add auth");
-    const md = renderSummary(thread, "gaps/add-auth-2026-03-26");
-    expect(md).toContain("gaps/add-auth-2026-03-26");
+    const md = renderSummary(thread, "warroom/add-auth-2026-03-26");
+    expect(md).toContain("warroom/add-auth-2026-03-26");
   });
 });

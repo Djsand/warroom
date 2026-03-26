@@ -6,7 +6,7 @@ describe("renderConversation", () => {
   it("renders empty thread", () => {
     const thread = new Thread("Add auth");
     const md = renderConversation(thread);
-    expect(md).toContain("# gaps conversation");
+    expect(md).toContain("# warroom conversation");
     expect(md).toContain("Add auth");
   });
 

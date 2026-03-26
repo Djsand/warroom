@@ -21,7 +21,7 @@ function estimateMinutes(messageCount: number): number {
 export function renderConversation(thread: Thread): string {
   const lines: string[] = [];
 
-  lines.push(`# gaps conversation — "${thread.task}"`);
+  lines.push(`# warroom conversation — "${thread.task}"`);
   lines.push("");
 
   // Participants section

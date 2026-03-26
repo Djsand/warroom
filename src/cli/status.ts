@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 
 export function handleStatus(): void {
-  const convBase = path.join(process.cwd(), ".gaps", "conversations");
+  const convBase = path.join(process.cwd(), ".warroom", "conversations");
 
   if (!fs.existsSync(convBase)) {
     console.log("No conversations yet.");

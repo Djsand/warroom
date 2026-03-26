@@ -1,6 +1,6 @@
-# gaps
+# warroom
 
-**AI agents that debate, build, and review your code. The conversation is the product.**
+**5 AI agents enter the war room. They debate, build, and review your code.**
 
 ---
 
@@ -32,7 +32,7 @@
 📊 5 agents · 5 messages · 1 revision · 2 bugs caught · 4 files · 70s
 ```
 
-*Real output from `gaps run "Add a hello world Express server"`*
+*Real output from `warroom run "Add a hello world Express server"`*
 
 ---
 
@@ -41,30 +41,30 @@
 ### Claude Code plugin (no API key needed)
 
 ```bash
-claude plugin add nicolai/gaps
+claude plugin add nicolai/warroom
 ```
 
 ```
-/gaps "Add user authentication with OAuth"
+/warroom "Add user authentication with OAuth"
 ```
 
 ### Standalone CLI
 
 ```bash
 # Option 1: Setup token (uses your Claude subscription)
-gaps setup --token $(claude setup-token)
+warroom setup --token $(claude setup-token)
 
 # Option 2: API key
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Run
-gaps run "Add user authentication with OAuth"
+warroom run "Add user authentication with OAuth"
 ```
 
 ### What you get
 
 ```
-.gaps/conversations/
+.warroom/conversations/
   conversation.md   # Full agent debate (the viral artifact)
   summary.md        # Decisions, trade-offs, bugs caught
 ```
@@ -102,13 +102,13 @@ The plugin mode needs no configuration.
 
 ```bash
 # Recommended: use your Claude subscription
-gaps setup --token <paste from `claude setup-token`>
+warroom setup --token <paste from `claude setup-token`>
 
 # Or: direct API key
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Or: browser login
-gaps setup --login
+warroom setup --login
 ```
 
 ```bash
@@ -122,10 +122,10 @@ export GAPS_AGENT_MODEL=claude-sonnet-4-6
 ## Commands
 
 ```
-gaps run <task>      Assign a task to the agent team
-gaps setup           Authenticate (setup token, API key, or browser)
-gaps read            Read the latest conversation
-gaps status          List all conversations
+warroom run <task>      Assign a task to the agent team
+warroom setup           Authenticate (setup token, API key, or browser)
+warroom read            Read the latest conversation
+warroom status          List all conversations
 ```
 
 ---

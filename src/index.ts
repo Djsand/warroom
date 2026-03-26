@@ -8,8 +8,8 @@ import { handleSetup, handleSetupLogin, handleSetupWithToken, handleSetupReset }
 const program = new Command();
 
 program
-  .name("gaps")
-  .description("AI agents that debate, build, and review your code.")
+  .name("warroom")
+  .description("5 AI agents enter the war room. They debate, build, and review your code.")
   .version("0.1.0");
 
 program

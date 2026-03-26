@@ -51,7 +51,7 @@ export async function runGaps(input: RunGapsInput): Promise<RunGapsOutput> {
   const thread = new Thread(task);
   const startedAt = thread.startedAt;
 
-  const branchName = `gaps/${slugify(task)}-${formatDate(startedAt)}`;
+  const branchName = `warroom/${slugify(task)}-${formatDate(startedAt)}`;
 
   const phaseConfig = {
     auth,

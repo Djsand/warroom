@@ -7,8 +7,8 @@ import {
   type OAuthCredentials,
 } from "@mariozechner/pi-ai/oauth";
 
-const GAPS_DIR = join(homedir(), ".gaps");
-const CREDS_PATH = join(GAPS_DIR, "credentials.json");
+const WARROOM_DIR = join(homedir(), ".warroom");
+const CREDS_PATH = join(WARROOM_DIR, "credentials.json");
 
 interface StoredCredentials {
   token: string;
@@ -29,7 +29,7 @@ function loadStored(): StoredCredentials | null {
 }
 
 function saveStored(stored: StoredCredentials): void {
-  mkdirSync(GAPS_DIR, { recursive: true });
+  mkdirSync(WARROOM_DIR, { recursive: true });
   writeFileSync(CREDS_PATH, JSON.stringify(stored, null, 2), {
     encoding: "utf-8",
     mode: 0o600,

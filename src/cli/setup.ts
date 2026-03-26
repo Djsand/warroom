@@ -7,11 +7,11 @@ import {
 } from "../auth/oauth.js";
 
 export async function handleSetup(): Promise<void> {
-  console.log(chalk.bold("\ngaps setup\n"));
+  console.log(chalk.bold("\nwarroom setup\n"));
 
   if (hasStoredCredentials()) {
     console.log(chalk.green("Already authenticated."));
-    console.log(chalk.dim("To re-authenticate: gaps setup --reset\n"));
+    console.log(chalk.dim("To re-authenticate: warroom setup --reset\n"));
     return;
   }
 
@@ -19,14 +19,14 @@ export async function handleSetup(): Promise<void> {
 
   console.log(chalk.bold("  Option 1: Setup token (recommended)"));
   console.log(chalk.dim("    Run `claude setup-token`, then:\n"));
-  console.log(`    ${chalk.cyan("gaps setup --token sk-ant-oat01-...")}\n`);
+  console.log(`    ${chalk.cyan("warroom setup --token sk-ant-oat01-...")}\n`);
 
   console.log(chalk.bold("  Option 2: Browser login"));
-  console.log(`    ${chalk.cyan("gaps setup --login")}\n`);
+  console.log(`    ${chalk.cyan("warroom setup --login")}\n`);
 }
 
 export async function handleSetupLogin(): Promise<void> {
-  console.log(chalk.bold("\ngaps login\n"));
+  console.log(chalk.bold("\nwarroom login\n"));
   console.log("Opening browser for Anthropic authentication...\n");
 
   try {
@@ -40,10 +40,10 @@ export async function handleSetupLogin(): Promise<void> {
 
 export async function handleSetupWithToken(token: string): Promise<void> {
   storeSetupToken(token);
-  console.log(chalk.green("\nAuthenticated. Token stored in ~/.gaps/credentials.json\n"));
+  console.log(chalk.green("\nAuthenticated. Token stored in ~/.warroom/credentials.json\n"));
 }
 
 export async function handleSetupReset(): Promise<void> {
   clearCredentials();
-  console.log(chalk.dim("\nCredentials cleared. Run `gaps setup` to re-authenticate.\n"));
+  console.log(chalk.dim("\nCredentials cleared. Run `warroom setup` to re-authenticate.\n"));
 }

@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { handleRun } from "./cli/run.js";
 import { handleRead } from "./cli/read.js";
 import { handleStatus } from "./cli/status.js";
+import { handleSetup, handleSetupWithToken, handleSetupReset } from "./cli/setup.js";
 
 const program = new Command();
 
@@ -18,6 +19,23 @@ program
   .action(async (task: string) => {
     try {
       await handleRun(task);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error: ${message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("setup")
+  .description("Authenticate with your Claude subscription or API key")
+  .option("--token <token>", "Provide a setup token or API key directly")
+  .option("--reset", "Clear stored credentials")
+  .action(async (opts: { token?: string; reset?: boolean }) => {
+    try {
+      if (opts.reset) return await handleSetupReset();
+      if (opts.token) return await handleSetupWithToken(opts.token);
+      await handleSetup();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`Error: ${message}`);

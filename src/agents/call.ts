@@ -1,11 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AgentRole, CodeChange } from "../types.js";
+import type { AgentRole, CodeChange, GapsAuth } from "../types.js";
 
 export interface CallAgentInput {
   role: AgentRole;
   systemPrompt: string;
   conversationContext: string;
-  apiKey: string;
+  auth: GapsAuth;
   model: string;
 }
 
@@ -16,7 +16,19 @@ export interface CallAgentResult {
 }
 
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
-  const client = new Anthropic({ apiKey: input.apiKey });
+  const clientOptions: ConstructorParameters<typeof Anthropic>[0] = {};
+
+  if (input.auth.method === "api-key") {
+    clientOptions.apiKey = input.auth.token;
+  } else {
+    // OAuth token or Claude credentials — send as Bearer auth
+    clientOptions.apiKey = input.auth.token;
+    clientOptions.defaultHeaders = {
+      Authorization: `Bearer ${input.auth.token}`,
+    };
+  }
+
+  const client = new Anthropic(clientOptions);
 
   const response = await client.messages.create({
     model: input.model,

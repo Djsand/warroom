@@ -38,7 +38,7 @@ export async function handleRun(task: string): Promise<void> {
 
   const result = await runGaps({
     task,
-    apiKey: config.apiKey,
+    auth: config.auth,
     projectDir,
     projectContext,
     architectModel: config.architectModel,

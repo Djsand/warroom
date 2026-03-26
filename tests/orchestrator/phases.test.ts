@@ -30,7 +30,7 @@ describe("runDesignPhase", () => {
   it("produces architect and challenger messages", async () => {
     const thread = new Thread("Add auth");
     await runDesignPhase(thread, {
-      apiKey: "test",
+      auth: { method: "api-key" as const, token: "test" },
       architectModel: "claude-sonnet-4-6-20250514",
       agentModel: "claude-sonnet-4-6-20250514",
       maxRounds: 4,

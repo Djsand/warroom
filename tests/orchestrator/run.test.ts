@@ -24,7 +24,7 @@ describe("runGaps", () => {
   it("produces a complete result with conversation and summary", async () => {
     const result = await runGaps({
       task: "Add auth",
-      apiKey: "test",
+      auth: { method: "api-key" as const, token: "test" },
       projectDir: "/tmp/test",
       projectContext: "",
     });

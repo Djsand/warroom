@@ -32,8 +32,15 @@ export interface CodeChange {
   action: "create" | "modify";
 }
 
+export type AuthMethod = "api-key" | "oauth-token" | "claude-credentials";
+
+export interface GapsAuth {
+  method: AuthMethod;
+  token: string;
+}
+
 export interface GapsConfig {
-  apiKey: string;
+  auth: GapsAuth;
   architectModel: string;
   agentModel: string;
   maxDesignRounds: number;

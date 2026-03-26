@@ -20,7 +20,7 @@ describe("callAgent", () => {
       role: "architect",
       systemPrompt: "You are the Architect.",
       conversationContext: "Task: add auth",
-      apiKey: "test-key",
+      auth: { method: "api-key", token: "test-key" },
       model: "claude-sonnet-4-6-20250514",
     };
 
@@ -44,7 +44,7 @@ describe("callAgent", () => {
       role: "builder",
       systemPrompt: "You are the Builder.",
       conversationContext: "Task: implement auth",
-      apiKey: "test-key",
+      auth: { method: "api-key", token: "test-key" },
       model: "claude-sonnet-4-6-20250514",
     };
 

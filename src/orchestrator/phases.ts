@@ -1,10 +1,10 @@
-import type { CodeChange } from "../types.js";
+import type { CodeChange, GapsAuth } from "../types.js";
 import { callAgent } from "../agents/call.js";
 import { getSystemPrompt } from "../agents/prompts.js";
 import type { Thread } from "../conversation/thread.js";
 
 export interface PhaseConfig {
-  apiKey: string;
+  auth: GapsAuth;
   architectModel: string;
   agentModel: string;
   maxRounds: number;
@@ -20,7 +20,7 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       role: "architect",
       systemPrompt: getSystemPrompt("architect", task, config.projectContext),
       conversationContext: thread.toPromptContext() || `Task: ${task}`,
-      apiKey: config.apiKey,
+      auth: config.auth,
       model: config.architectModel,
     });
 
@@ -37,7 +37,7 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
         role: "challenger",
         systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
         conversationContext: thread.toPromptContext(),
-        apiKey: config.apiKey,
+        auth: config.auth,
         model: config.agentModel,
       });
 
@@ -55,7 +55,7 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       role: "challenger",
       systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
       conversationContext: thread.toPromptContext(),
-      apiKey: config.apiKey,
+      auth: config.auth,
       model: config.agentModel,
     });
 
@@ -81,7 +81,7 @@ export async function runBuildPhase(thread: Thread, config: PhaseConfig): Promis
     conversationContext:
       thread.toPromptContext() +
       "\n\nIMPORTANT: Output every file using the format:\nFILE: path/to/file.ext\n```language\n// code here\n```",
-    apiKey: config.apiKey,
+    auth: config.auth,
     model: config.agentModel,
   });
 
@@ -103,7 +103,7 @@ export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promi
     role: "reviewer",
     systemPrompt: getSystemPrompt("reviewer", task, config.projectContext),
     conversationContext: thread.toPromptContext(),
-    apiKey: config.apiKey,
+    auth: config.auth,
     model: config.agentModel,
   });
 
@@ -118,7 +118,7 @@ export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promi
     role: "breaker",
     systemPrompt: getSystemPrompt("breaker", task, config.projectContext),
     conversationContext: thread.toPromptContext(),
-    apiKey: config.apiKey,
+    auth: config.auth,
     model: config.agentModel,
   });
 

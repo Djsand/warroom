@@ -1,4 +1,4 @@
-import type { GapsResult } from "../types.js";
+import type { GapsResult, GapsAuth } from "../types.js";
 import { Thread } from "../conversation/thread.js";
 import { renderConversation } from "../conversation/renderer.js";
 import { renderSummary } from "../conversation/summary.js";
@@ -7,7 +7,7 @@ import { runDesignPhase, runBuildPhase, runReviewPhase } from "./phases.js";
 
 export interface RunGapsInput {
   task: string;
-  apiKey: string;
+  auth: GapsAuth;
   projectDir: string;
   projectContext: string;
   architectModel?: string;
@@ -39,7 +39,7 @@ export function formatDate(date: Date): string {
 export async function runGaps(input: RunGapsInput): Promise<RunGapsOutput> {
   const {
     task,
-    apiKey,
+    auth,
     projectDir,
     projectContext,
     architectModel = "claude-sonnet-4-6-20250514",
@@ -54,7 +54,7 @@ export async function runGaps(input: RunGapsInput): Promise<RunGapsOutput> {
   const branchName = `gaps/${slugify(task)}-${formatDate(startedAt)}`;
 
   const phaseConfig = {
-    apiKey,
+    auth,
     architectModel,
     agentModel,
     maxRounds: maxDesignRounds,

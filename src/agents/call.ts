@@ -22,10 +22,7 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
     clientOptions.apiKey = input.auth.token;
   } else {
     // OAuth token or Claude credentials — send as Bearer auth
-    clientOptions.apiKey = input.auth.token;
-    clientOptions.defaultHeaders = {
-      Authorization: `Bearer ${input.auth.token}`,
-    };
+    clientOptions.authToken = input.auth.token;
   }
 
   const client = new Anthropic(clientOptions);

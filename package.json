@@ -1,7 +1,7 @@
 {
   "name": "gaps",
-  "version": "1.0.0",
-  "description": "AI multi-agent debate tool — 5 AI agents debate, build, and review code",
+  "version": "0.1.0",
+  "description": "AI agents that debate, build, and review your code. The conversation is the product.",
   "type": "module",
   "bin": {
     "gaps": "./dist/index.js"
@@ -9,11 +9,33 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "test": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "ai",
+    "agents",
+    "multi-agent",
+    "code-review",
+    "claude",
+    "anthropic",
+    "cli",
+    "developer-tools"
+  ],
+  "author": "nicolai",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicolai/gaps"
+  },
+  "files": [
+    "dist",
+    "agents",
+    "skills",
+    "plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@mariozechner/pi-ai": "^0.62.0",

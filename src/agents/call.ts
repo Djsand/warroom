@@ -1,0 +1,52 @@
+import Anthropic from "@anthropic-ai/sdk";
+import type { AgentRole, CodeChange } from "../types.js";
+
+export interface CallAgentInput {
+  role: AgentRole;
+  systemPrompt: string;
+  conversationContext: string;
+  apiKey: string;
+  model: string;
+}
+
+export interface CallAgentResult {
+  content: string;
+  codeChanges: CodeChange[];
+  tokensUsed: number;
+}
+
+export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
+  const client = new Anthropic({ apiKey: input.apiKey });
+
+  const response = await client.messages.create({
+    model: input.model,
+    max_tokens: 4096,
+    system: input.systemPrompt,
+    messages: [{ role: "user", content: input.conversationContext }],
+  });
+
+  const textContent = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+
+  const codeChanges = extractCodeChanges(textContent);
+  const tokensUsed =
+    (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+
+  return { content: textContent, codeChanges, tokensUsed };
+}
+
+function extractCodeChanges(text: string): CodeChange[] {
+  const changes: CodeChange[] = [];
+  const fileBlockRegex = /FILE:\s*([\w/.\\-]+)\s*\n```[\w]*\n([\s\S]*?)```/g;
+  let match;
+  while ((match = fileBlockRegex.exec(text)) !== null) {
+    changes.push({
+      filePath: match[1].trim(),
+      content: match[2].trim(),
+      action: "create",
+    });
+  }
+  return changes;
+}

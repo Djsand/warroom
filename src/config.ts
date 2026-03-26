@@ -10,17 +10,32 @@ import type { GapsConfig, GapsAuth } from "./types.js";
  * 3. ~/.gaps/credentials.json (stored from `gaps setup`)
  * 4. Claude Code's credential store (~/.claude/.credentials.json)
  */
-function resolveAuth(): GapsAuth {
-  // 1. Direct API key
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
-    return { method: "api-key", token: apiKey };
+function detectMethod(token: string): GapsAuth["method"] {
+  // OAuth tokens from `claude setup-token` start with sk-ant-oat01-
+  // Auth tokens can also start with other patterns
+  if (token.startsWith("sk-ant-oat01-") || token.startsWith("sk-ant-oat")) {
+    return "oauth-token";
   }
+  return "api-key";
+}
 
-  // 2. Claude Code OAuth token env var
+function resolveAuth(): GapsAuth {
+  // 1. Claude Code OAuth token env var (explicit OAuth)
   const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   if (oauthToken) {
     return { method: "oauth-token", token: oauthToken };
+  }
+
+  // 2. Anthropic auth token env var (Bearer auth)
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  if (authToken) {
+    return { method: "oauth-token", token: authToken };
+  }
+
+  // 3. API key env var (auto-detect if it's actually an OAuth token)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey) {
+    return { method: detectMethod(apiKey), token: apiKey };
   }
 
   // 3. gaps credentials file
@@ -29,7 +44,7 @@ function resolveAuth(): GapsAuth {
     try {
       const creds = JSON.parse(readFileSync(gapsCredsPath, "utf-8"));
       if (creds.token) {
-        return { method: creds.method ?? "oauth-token", token: creds.token };
+        return { method: creds.method ?? detectMethod(creds.token), token: creds.token };
       }
     } catch {
       // ignore malformed file

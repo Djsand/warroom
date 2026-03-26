@@ -16,17 +16,8 @@ export interface CallAgentResult {
 }
 
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
-  const clientOptions: ConstructorParameters<typeof Anthropic>[0] = {};
-
-  if (input.auth.method === "api-key") {
-    clientOptions.apiKey = input.auth.token;
-  } else {
-    // OAuth token — send ONLY as Bearer auth, suppress X-Api-Key
-    clientOptions.authToken = input.auth.token;
-    clientOptions.apiKey = null;
-  }
-
-  const client = new Anthropic(clientOptions);
+  // Auth token is always a resolved API key (OAuth tokens are pre-exchanged in config)
+  const client = new Anthropic({ apiKey: input.auth.token });
 
   const response = await client.messages.create({
     model: input.model,

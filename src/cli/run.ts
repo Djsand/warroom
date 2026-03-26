@@ -5,7 +5,7 @@ import { runGaps, slugify, formatDate } from "../orchestrator/run.js";
 import { loadConfig } from "../config.js";
 
 export async function handleRun(task: string): Promise<void> {
-  const config = loadConfig();
+  const config = await loadConfig();
   const projectDir = process.cwd();
 
   // Read package.json for basic project context if it exists

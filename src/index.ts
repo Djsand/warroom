@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { handleRun } from "./cli/run.js";
 import { handleRead } from "./cli/read.js";
 import { handleStatus } from "./cli/status.js";
-import { handleSetup, handleSetupWithToken, handleSetupReset } from "./cli/setup.js";
+import { handleSetup, handleSetupLogin, handleSetupWithToken, handleSetupReset } from "./cli/setup.js";
 
 const program = new Command();
 
@@ -29,11 +29,13 @@ program
 program
   .command("setup")
   .description("Authenticate with your Claude subscription or API key")
-  .option("--token <token>", "Provide a setup token or API key directly")
+  .option("--login", "Login via browser (opens Anthropic OAuth)")
+  .option("--token <token>", "Provide a setup token from `claude setup-token`")
   .option("--reset", "Clear stored credentials")
-  .action(async (opts: { token?: string; reset?: boolean }) => {
+  .action(async (opts: { login?: boolean; token?: string; reset?: boolean }) => {
     try {
       if (opts.reset) return await handleSetupReset();
+      if (opts.login) return await handleSetupLogin();
       if (opts.token) return await handleSetupWithToken(opts.token);
       await handleSetup();
     } catch (err: unknown) {

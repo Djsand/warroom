@@ -1,17 +1,16 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-import { resolveApiKeyFromSetupToken } from "./auth/oauth.js";
+import { resolveStoredApiKey } from "./auth/oauth.js";
 import type { GapsConfig, GapsAuth } from "./types.js";
 
 /**
- * Resolve auth credentials. Checks in order:
- * 1. ANTHROPIC_API_KEY env var (direct API key)
- * 2. ~/.gaps/credentials.json (setup token → OAuth → API key)
- * 3. Claude Code credential store
+ * Resolve auth. Checks in order:
+ * 1. ANTHROPIC_API_KEY env var
+ * 2. CLAUDE_CODE_OAUTH_TOKEN env var
+ * 3. ~/.gaps/credentials.json (from `gaps setup`)
+ *
+ * All tokens are sent as X-Api-Key (same as OpenClaw).
  */
-export async function loadConfig(): Promise<GapsConfig> {
-  const auth = await resolveAuth();
+export function loadConfig(): GapsConfig {
+  const auth = resolveAuth();
 
   return {
     auth,
@@ -23,55 +22,30 @@ export async function loadConfig(): Promise<GapsConfig> {
   };
 }
 
-async function resolveAuth(): Promise<GapsAuth> {
-  // 1. Direct API key (always works)
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey && !apiKey.startsWith("sk-ant-oat")) {
-    return { method: "api-key", token: apiKey };
+function resolveAuth(): GapsAuth {
+  // 1. API key or setup token from env
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey) {
+    return { method: "api-key", token: envKey };
   }
 
-  // 2. Setup token from env var — exchange for API key via OAuth
-  const setupToken = apiKey?.startsWith("sk-ant-oat")
-    ? apiKey
-    : (process.env.CLAUDE_CODE_OAUTH_TOKEN ?? process.env.ANTHROPIC_AUTH_TOKEN);
-
-  if (setupToken) {
-    const resolvedKey = await resolveApiKeyFromSetupToken(setupToken);
-    return { method: "oauth-token", token: resolvedKey };
+  // 2. OAuth token from env
+  const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? process.env.ANTHROPIC_AUTH_TOKEN;
+  if (oauthToken) {
+    return { method: "api-key", token: oauthToken };
   }
 
-  // 3. Stored setup token from `gaps setup`
-  const gapsCredsPath = join(homedir(), ".gaps", "credentials.json");
-  if (existsSync(gapsCredsPath)) {
-    try {
-      const creds = JSON.parse(readFileSync(gapsCredsPath, "utf-8"));
-      if (creds.setupToken) {
-        const resolvedKey = await resolveApiKeyFromSetupToken(creds.setupToken);
-        return { method: "oauth-token", token: resolvedKey };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // 4. Claude Code credential store
-  const claudeCredsPath = join(homedir(), ".claude", ".credentials.json");
-  if (existsSync(claudeCredsPath)) {
-    try {
-      const creds = JSON.parse(readFileSync(claudeCredsPath, "utf-8"));
-      if (creds.refreshToken) {
-        const resolvedKey = await resolveApiKeyFromSetupToken(creds.refreshToken);
-        return { method: "oauth-token", token: resolvedKey };
-      }
-    } catch {
-      // ignore
-    }
+  // 3. Stored credentials from `gaps setup`
+  const storedKey = resolveStoredApiKey();
+  if (storedKey) {
+    return { method: "api-key", token: storedKey };
   }
 
   throw new Error(
     "No authentication found. Set up with one of:\n\n" +
-    "  1. gaps setup              (use your Claude subscription)\n" +
-    "  2. export ANTHROPIC_API_KEY=your-key  (use an API key)\n\n" +
-    "Run `gaps setup` for the easiest option."
+    "  1. gaps setup --token <token>   (paste from `claude setup-token`)\n" +
+    "  2. gaps setup --login           (browser OAuth)\n" +
+    "  3. export ANTHROPIC_API_KEY=... (API key)\n\n" +
+    "Run `gaps setup` for options."
   );
 }

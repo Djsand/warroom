@@ -16,7 +16,7 @@ export interface CallAgentResult {
 }
 
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
-  // Auth token is always a resolved API key (OAuth tokens are pre-exchanged in config)
+  // All tokens (API keys, setup tokens, OAuth access tokens) are sent as X-Api-Key
   const client = new Anthropic({ apiKey: input.auth.token });
 
   const response = await client.messages.create({

@@ -3,7 +3,6 @@ import {
   storeSetupToken,
   hasStoredCredentials,
   clearCredentials,
-  resolveApiKeyFromSetupToken,
   loginInteractive,
 } from "../auth/oauth.js";
 
@@ -18,12 +17,12 @@ export async function handleSetup(): Promise<void> {
 
   console.log("Two ways to authenticate:\n");
 
-  console.log(chalk.bold("  Option 1: Login with browser (recommended)"));
-  console.log(chalk.dim("    gaps setup --login\n"));
+  console.log(chalk.bold("  Option 1: Setup token (recommended)"));
+  console.log(chalk.dim("    Run `claude setup-token`, then:\n"));
+  console.log(`    ${chalk.cyan("gaps setup --token sk-ant-oat01-...")}\n`);
 
-  console.log(chalk.bold("  Option 2: Paste a setup token"));
-  console.log(chalk.dim("    Run `claude setup-token` then:"));
-  console.log(chalk.dim("    gaps setup --token sk-ant-oat01-...\n"));
+  console.log(chalk.bold("  Option 2: Browser login"));
+  console.log(`    ${chalk.cyan("gaps setup --login")}\n`);
 }
 
 export async function handleSetupLogin(): Promise<void> {
@@ -32,36 +31,16 @@ export async function handleSetupLogin(): Promise<void> {
 
   try {
     await loginInteractive();
-    console.log(chalk.green("\nAuthenticated successfully."));
-    console.log(chalk.dim("Credentials stored in ~/.gaps/credentials.json\n"));
+    console.log(chalk.green("\nAuthenticated successfully.\n"));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`\nLogin failed: ${msg}\n`));
-    console.log("Try using a setup token instead:");
-    console.log(chalk.dim("  claude setup-token"));
-    console.log(chalk.dim("  gaps setup --token sk-ant-oat01-...\n"));
   }
 }
 
 export async function handleSetupWithToken(token: string): Promise<void> {
-  if (!token.startsWith("sk-ant-oat")) {
-    console.log(chalk.yellow("\nThat doesn't look like a setup token (should start with sk-ant-oat)."));
-    console.log(chalk.dim("If it's an API key, use: export ANTHROPIC_API_KEY=...\n"));
-    return;
-  }
-
-  console.log(chalk.dim("Exchanging setup token for API access..."));
-
-  try {
-    await resolveApiKeyFromSetupToken(token);
-    storeSetupToken(token);
-    console.log(chalk.green("\nAuthenticated successfully."));
-    console.log(chalk.dim("Credentials stored in ~/.gaps/credentials.json\n"));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(chalk.red(`\nToken exchange failed: ${msg}`));
-    console.log(chalk.dim("Make sure the token is valid. Generate a new one with: claude setup-token\n"));
-  }
+  storeSetupToken(token);
+  console.log(chalk.green("\nAuthenticated. Token stored in ~/.gaps/credentials.json\n"));
 }
 
 export async function handleSetupReset(): Promise<void> {

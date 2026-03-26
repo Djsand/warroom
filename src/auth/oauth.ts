@@ -2,9 +2,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
-  refreshAnthropicToken,
-  anthropicOAuthProvider,
   loginAnthropic,
+  anthropicOAuthProvider,
   type OAuthCredentials,
 } from "@mariozechner/pi-ai/oauth";
 
@@ -12,7 +11,8 @@ const GAPS_DIR = join(homedir(), ".gaps");
 const CREDS_PATH = join(GAPS_DIR, "credentials.json");
 
 interface StoredCredentials {
-  setupToken: string;
+  token: string;
+  type: "setup-token" | "api-key" | "oauth";
   oauthCredentials?: OAuthCredentials;
   savedAt: string;
 }
@@ -21,7 +21,7 @@ function loadStored(): StoredCredentials | null {
   if (!existsSync(CREDS_PATH)) return null;
   try {
     const data = JSON.parse(readFileSync(CREDS_PATH, "utf-8"));
-    if (data.setupToken) return data as StoredCredentials;
+    if (data.token) return data as StoredCredentials;
     return null;
   } catch {
     return null;
@@ -37,43 +37,36 @@ function saveStored(stored: StoredCredentials): void {
 }
 
 /**
- * Exchange a setup token for an API key.
- * Caches the OAuth credentials and auto-refreshes when expired.
+ * Get the API key to use. Setup tokens are sent directly as X-Api-Key
+ * (same as OpenClaw does — no OAuth exchange needed).
  */
-export async function resolveApiKeyFromSetupToken(setupToken: string): Promise<string> {
-  let stored = loadStored();
+export function resolveStoredApiKey(): string | null {
+  const stored = loadStored();
+  if (!stored) return null;
 
-  // If we have cached credentials that aren't expired, use them
-  if (stored?.oauthCredentials && Date.now() < stored.oauthCredentials.expires) {
+  // Setup tokens and API keys are sent directly as X-Api-Key
+  if (stored.type === "setup-token" || stored.type === "api-key") {
+    return stored.token;
+  }
+
+  // OAuth credentials from browser login — use the access token
+  if (stored.type === "oauth" && stored.oauthCredentials) {
     return anthropicOAuthProvider.getApiKey(stored.oauthCredentials);
   }
 
-  // Refresh using the setup token (which IS the refresh token)
-  const credentials = await refreshAnthropicToken(
-    stored?.oauthCredentials?.refresh ?? setupToken
-  );
-
-  // Cache the new credentials
-  saveStored({
-    setupToken,
-    oauthCredentials: credentials,
-    savedAt: new Date().toISOString(),
-  });
-
-  return anthropicOAuthProvider.getApiKey(credentials);
+  return stored.token;
 }
 
 /**
  * Interactive login flow — opens browser for OAuth
  */
-export async function loginInteractive(): Promise<string> {
+export async function loginInteractive(): Promise<void> {
   const credentials = await loginAnthropic({
     onAuth: (info) => {
       console.log(`\nOpen this URL to authenticate:\n  ${info.url}\n`);
       if (info.instructions) console.log(info.instructions);
     },
     onPrompt: async (prompt) => {
-      // For non-interactive, this won't be called in normal flow
       console.log(prompt.message);
       return "";
     },
@@ -83,34 +76,29 @@ export async function loginInteractive(): Promise<string> {
   });
 
   saveStored({
-    setupToken: credentials.refresh,
+    token: credentials.access,
+    type: "oauth",
     oauthCredentials: credentials,
     savedAt: new Date().toISOString(),
   });
-
-  return credentials.refresh;
 }
 
 /**
- * Store a setup token from `claude setup-token`
+ * Store a setup token from `claude setup-token`.
+ * The token is used directly as X-Api-Key (same as OpenClaw).
  */
 export function storeSetupToken(token: string): void {
   saveStored({
-    setupToken: token,
+    token,
+    type: "setup-token",
     savedAt: new Date().toISOString(),
   });
 }
 
-/**
- * Check if we have stored credentials
- */
 export function hasStoredCredentials(): boolean {
   return loadStored() !== null;
 }
 
-/**
- * Clear stored credentials
- */
 export function clearCredentials(): void {
   if (existsSync(CREDS_PATH)) {
     writeFileSync(CREDS_PATH, "{}", "utf-8");

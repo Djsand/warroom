@@ -46,6 +46,21 @@
 
 ## Quick start
 
+### As a Claude Code plugin (recommended)
+
+```bash
+claude plugin add nicolai/gaps
+```
+
+Then in Claude Code:
+```
+/gaps "Add user authentication with OAuth"
+```
+
+No API key needed. Works with your Claude Code subscription.
+
+### As a standalone CLI
+
 ```bash
 npm install -g gaps
 export ANTHROPIC_API_KEY=your-key
@@ -83,10 +98,12 @@ gaps runs your task through four phases:
 
 ---
 
-## Configuration
+## Configuration (standalone CLI only)
+
+The plugin mode requires no configuration. For standalone CLI usage:
 
 ```bash
-# Required
+# Required for standalone CLI
 export ANTHROPIC_API_KEY=your-key
 
 # Optional

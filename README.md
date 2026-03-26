@@ -113,8 +113,8 @@ warroom setup --login
 
 ```bash
 # Optional model override
-export GAPS_ARCHITECT_MODEL=claude-sonnet-4-6
-export GAPS_AGENT_MODEL=claude-sonnet-4-6
+export WARROOM_ARCHITECT_MODEL=claude-sonnet-4-6
+export WARROOM_AGENT_MODEL=claude-sonnet-4-6
 ```
 
 ---

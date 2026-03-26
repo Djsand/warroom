@@ -21,8 +21,9 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
   if (input.auth.method === "api-key") {
     clientOptions.apiKey = input.auth.token;
   } else {
-    // OAuth token or Claude credentials — send as Bearer auth
+    // OAuth token — send ONLY as Bearer auth, suppress X-Api-Key
     clientOptions.authToken = input.auth.token;
+    clientOptions.apiKey = null;
   }
 
   const client = new Anthropic(clientOptions);

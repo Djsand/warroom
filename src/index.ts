@@ -20,8 +20,16 @@ program
     try {
       await handleRun(task);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`Error: ${message}`);
+      if (err && typeof err === "object" && "status" in err) {
+        const apiErr = err as Record<string, unknown>;
+        console.error(`API Error (${apiErr.status}):`, JSON.stringify(apiErr.error ?? apiErr.message, null, 2));
+        if (apiErr.headers) {
+          const h = apiErr.headers as Record<string, string>;
+          if (h["request-id"]) console.error(`Request ID: ${h["request-id"]}`);
+        }
+      } else {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      }
       process.exit(1);
     }
   });

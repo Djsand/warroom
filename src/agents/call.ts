@@ -29,9 +29,10 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
       apiKey: null,
       authToken: input.auth.token,
       defaultHeaders: {
-        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14",
         "user-agent": "claude-cli/2.1.75",
         "x-app": "cli",
+        "accept": "application/json",
       },
     });
   } else {

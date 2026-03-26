@@ -1,7 +1,20 @@
 import type { CodeChange, GapsAuth } from "../types.js";
 import { callAgent } from "../agents/call.js";
 import { getSystemPrompt } from "../agents/prompts.js";
+import { AGENT_EMOJI, AGENT_LABEL } from "../types.js";
+import type { AgentRole } from "../types.js";
 import type { Thread } from "../conversation/thread.js";
+
+function logAgent(role: AgentRole, content: string): void {
+  const emoji = AGENT_EMOJI[role];
+  const label = AGENT_LABEL[role];
+  const short = content.replace(/\n/g, " ").slice(0, 80);
+  console.log(`  ${emoji} ${label}: ${short}${content.length > 80 ? "..." : ""}`);
+}
+
+function logPhase(name: string): void {
+  console.log(`\n  --- ${name} ---\n`);
+}
 
 export interface PhaseConfig {
   auth: GapsAuth;
@@ -12,10 +25,11 @@ export interface PhaseConfig {
 }
 
 export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promise<void> {
+  logPhase("Phase 1: Design");
   const task = thread.task;
 
   for (let round = 0; round < config.maxRounds; round++) {
-    // Architect turn
+    console.log(`  Waiting for Architect...`);
     const architectResult = await callAgent({
       role: "architect",
       systemPrompt: getSystemPrompt("architect", task, config.projectContext),
@@ -23,16 +37,11 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       auth: config.auth,
       model: config.architectModel,
     });
+    thread.add({ role: "architect", content: architectResult.content, phase: "design" });
+    logAgent("architect", architectResult.content);
 
-    thread.add({
-      role: "architect",
-      content: architectResult.content,
-      phase: "design",
-    });
-
-    // Stop if Architect signals Builder to proceed
     if (architectResult.content.toLowerCase().includes("@builder")) {
-      // Give Challenger one final say
+      console.log(`  Waiting for Challenger (final review)...`);
       const challengerFinalResult = await callAgent({
         role: "challenger",
         systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
@@ -40,17 +49,12 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
         auth: config.auth,
         model: config.agentModel,
       });
-
-      thread.add({
-        role: "challenger",
-        content: challengerFinalResult.content,
-        phase: "design",
-      });
-
+      thread.add({ role: "challenger", content: challengerFinalResult.content, phase: "design" });
+      logAgent("challenger", challengerFinalResult.content);
       break;
     }
 
-    // Challenger turn
+    console.log(`  Waiting for Challenger...`);
     const challengerResult = await callAgent({
       role: "challenger",
       systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
@@ -58,78 +62,57 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       auth: config.auth,
       model: config.agentModel,
     });
+    thread.add({ role: "challenger", content: challengerResult.content, phase: "design" });
+    logAgent("challenger", challengerResult.content);
 
-    thread.add({
-      role: "challenger",
-      content: challengerResult.content,
-      phase: "design",
-    });
-
-    // Stop if Challenger approves
-    if (challengerResult.content.toLowerCase().includes("design approved")) {
-      break;
-    }
+    if (challengerResult.content.toLowerCase().includes("design approved")) break;
   }
 }
 
 export async function runBuildPhase(thread: Thread, config: PhaseConfig): Promise<CodeChange[]> {
-  const task = thread.task;
-
+  logPhase("Phase 2: Build");
+  console.log(`  Waiting for Builder...`);
   const builderResult = await callAgent({
     role: "builder",
-    systemPrompt: getSystemPrompt("builder", task, config.projectContext),
+    systemPrompt: getSystemPrompt("builder", thread.task, config.projectContext),
     conversationContext:
       thread.toPromptContext() +
       "\n\nIMPORTANT: Output every file using the format:\nFILE: path/to/file.ext\n```language\n// code here\n```",
     auth: config.auth,
     model: config.agentModel,
   });
-
-  thread.add({
-    role: "builder",
-    content: builderResult.content,
-    phase: "build",
-    codeChanges: builderResult.codeChanges,
-  });
-
+  thread.add({ role: "builder", content: builderResult.content, phase: "build", codeChanges: builderResult.codeChanges });
+  logAgent("builder", builderResult.content);
+  console.log(`  Files: ${builderResult.codeChanges.length}`);
   return builderResult.codeChanges;
 }
 
 export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promise<boolean> {
-  const task = thread.task;
+  logPhase("Phase 3: Review");
 
-  // Reviewer turn
+  console.log(`  Waiting for Reviewer...`);
   const reviewerResult = await callAgent({
     role: "reviewer",
-    systemPrompt: getSystemPrompt("reviewer", task, config.projectContext),
+    systemPrompt: getSystemPrompt("reviewer", thread.task, config.projectContext),
     conversationContext: thread.toPromptContext(),
     auth: config.auth,
     model: config.agentModel,
   });
+  thread.add({ role: "reviewer", content: reviewerResult.content, phase: "review" });
+  logAgent("reviewer", reviewerResult.content);
 
-  thread.add({
-    role: "reviewer",
-    content: reviewerResult.content,
-    phase: "review",
-  });
-
-  // Breaker turn
+  console.log(`  Waiting for Breaker...`);
   const breakerResult = await callAgent({
     role: "breaker",
-    systemPrompt: getSystemPrompt("breaker", task, config.projectContext),
+    systemPrompt: getSystemPrompt("breaker", thread.task, config.projectContext),
     conversationContext: thread.toPromptContext(),
     auth: config.auth,
     model: config.agentModel,
   });
-
-  thread.add({
-    role: "breaker",
-    content: breakerResult.content,
-    phase: "review",
-  });
+  thread.add({ role: "breaker", content: breakerResult.content, phase: "review" });
+  logAgent("breaker", breakerResult.content);
 
   const reviewerApproved = reviewerResult.content.toLowerCase().includes("lgtm");
   const breakerApproved = breakerResult.content.toLowerCase().includes("passed");
-
   return reviewerApproved && breakerApproved;
 }

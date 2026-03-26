@@ -15,9 +15,29 @@ export interface CallAgentResult {
   tokensUsed: number;
 }
 
+function isOAuthToken(token: string): boolean {
+  return token.includes("sk-ant-oat");
+}
+
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
-  // All tokens (API keys, setup tokens, OAuth access tokens) are sent as X-Api-Key
-  const client = new Anthropic({ apiKey: input.auth.token });
+  let client: Anthropic;
+
+  if (isOAuthToken(input.auth.token)) {
+    // OAuth tokens need Bearer auth + Claude Code identity headers
+    // (same approach as OpenClaw / pi-ai)
+    client = new Anthropic({
+      apiKey: null,
+      authToken: input.auth.token,
+      defaultHeaders: {
+        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+        "user-agent": "claude-cli/2.1.75",
+        "x-app": "cli",
+      },
+    });
+  } else {
+    // Standard API key
+    client = new Anthropic({ apiKey: input.auth.token });
+  }
 
   const response = await client.messages.create({
     model: input.model,

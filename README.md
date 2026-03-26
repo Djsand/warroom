@@ -41,7 +41,7 @@
 ### Claude Code plugin (no API key needed)
 
 ```bash
-claude plugin add nicolai/warroom
+claude plugin install https://github.com/Djsand/warroom
 ```
 
 ```

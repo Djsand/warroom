@@ -40,10 +40,18 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
     client = new Anthropic({ apiKey: input.auth.token });
   }
 
+  // OAuth requires Claude Code identity in system prompt (array format)
+  const system = isOAuthToken(input.auth.token)
+    ? [
+        { type: "text" as const, text: "You are Claude Code, Anthropic's official CLI for Claude." },
+        { type: "text" as const, text: input.systemPrompt },
+      ]
+    : input.systemPrompt;
+
   const response = await client.messages.create({
     model: input.model,
     max_tokens: 4096,
-    system: input.systemPrompt,
+    system,
     messages: [{ role: "user", content: input.conversationContext }],
   });
 

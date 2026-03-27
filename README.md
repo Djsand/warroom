@@ -172,6 +172,9 @@ Real conversations from warroom sessions — each one shows the agents debating,
 - [Express Server](examples/express-server.md) — 2 bugs caught in a simple hello world
 - [JWT Authentication](examples/auth-system.md) — 3 security issues found by Breaker
 - [CSV to JSON CLI](examples/cli-tool.md) — streaming architecture stress-tested
+- [React Todo App](examples/react-todo-app.md) — localStorage race conditions and state bugs
+- [Database Schema](examples/database-schema.md) — multi-tenant isolation flaws exposed
+- [WebSocket Chat](examples/websocket-chat.md) — XSS, flooding, and 10k connection limits
 
 Want to add your own? See [CONTRIBUTING.md](CONTRIBUTING.md).
 

@@ -3,11 +3,28 @@ import path from "path";
 import chalk from "chalk";
 import { runGaps, slugify, formatDate } from "../orchestrator/run.js";
 import { loadConfig } from "../config.js";
+import type { ConversationStats, ConversationMessage } from "../types.js";
 
 const BANNER = `
   ${chalk.bold.red("W A R R O O M")}
   ${chalk.dim("5 agents. 1 task. Let the debate begin.")}
 `;
+
+export function formatStats(stats: ConversationStats, messages: readonly ConversationMessage[]): string {
+  const agentCount = new Set(messages.map((m) => m.role)).size;
+  const durationSec = Math.round(stats.durationMs / 1000);
+
+  const parts = [
+    `${agentCount} agents`,
+    `${stats.totalMessages} messages`,
+    `${stats.designRevisions} revisions`,
+    `${stats.bugsCaught} bugs caught`,
+    `${stats.filesChanged} files`,
+    `${durationSec}s`,
+  ];
+
+  return `\u{1F4CA} ${parts.join(chalk.dim(" \u00B7 "))}`;
+}
 
 export async function handleRun(task: string): Promise<void> {
   const config = loadConfig();
@@ -65,17 +82,10 @@ export async function handleRun(task: string): Promise<void> {
   fs.writeFileSync(summaryPath, result.summaryMd, "utf-8");
 
   // Results
-  const { stats } = result;
-  const durationSec = (stats.durationMs / 1000).toFixed(0);
-
   console.log("");
   console.log(chalk.bold.green("  MISSION COMPLETE"));
   console.log("");
-  console.log(`  ${chalk.white("Messages")}     ${stats.totalMessages}`);
-  console.log(`  ${chalk.white("Revisions")}    ${stats.designRevisions}`);
-  console.log(`  ${chalk.white("Bugs caught")}  ${stats.bugsCaught}`);
-  console.log(`  ${chalk.white("Files")}        ${stats.filesChanged}`);
-  console.log(`  ${chalk.white("Duration")}     ${durationSec}s`);
+  console.log(`  ${formatStats(result.stats, result.messages)}`);
   console.log("");
   console.log(`  ${chalk.cyan(conversationPath)}`);
   console.log(`  ${chalk.cyan(summaryPath)}`);

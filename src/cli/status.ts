@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
+import chalk from "chalk";
 
 export function handleStatus(): void {
   const convBase = path.join(process.cwd(), ".warroom", "conversations");
 
   if (!fs.existsSync(convBase)) {
-    console.log("No conversations yet.");
+    console.log(chalk.dim("  No conversations yet."));
     return;
   }
 
@@ -20,10 +21,11 @@ export function handleStatus(): void {
     .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
   if (dirs.length === 0) {
-    console.log("No conversations yet.");
+    console.log(chalk.dim("  No conversations yet."));
     return;
   }
 
+  console.log("");
   const shown = dirs.slice(0, 10);
   for (const dir of shown) {
     const dateStr = dir.mtime.toLocaleDateString("en-US", {
@@ -31,6 +33,7 @@ export function handleStatus(): void {
       month: "short",
       day: "numeric",
     });
-    console.log(`✓ ${dir.name}  (${dateStr})`);
+    console.log(`  ${chalk.white(dir.name)}  ${chalk.dim(dateStr)}`);
   }
+  console.log("");
 }

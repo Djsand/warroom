@@ -9,6 +9,8 @@
 [![CI](https://github.com/Djsand/warroom/actions/workflows/ci.yml/badge.svg)](https://github.com/Djsand/warroom/actions/workflows/ci.yml)
 [![license](https://img.shields.io/github/license/Djsand/warroom)](LICENSE)
 
+<img src="docs/demo.gif" alt="warroom demo" width="640">
+
 </div>
 
 ---
@@ -16,33 +18,35 @@
 > Give it a task. Five agents argue about the design, implement it, review each other's work, and try to break it. You get finished code **and a conversation showing exactly how they got there.**
 
 ```
-🏗️ Architect: I propose splitting server.js (app creation + routes) from
-   index.js (entry point). The app is exported without side effects — tests
-   can import it with supertest without binding a port...
+  warroom
+  5 agents. 1 task. Let the debate begin.
 
-😈 Challenger: Two real issues. No "main" or "scripts" in package.json —
-   npm start is broken on a fresh clone. And app.listen() can fail on
-   EADDRINUSE with no handler — process crashes with a raw stack trace.
+  Task: Add a hello world Express server
 
-🏗️ Architect: Both valid. Adding start script, main field, and error
-   handler on the server instance with EADDRINUSE detection.
-   @Builder: proceed.
+  ────────────────────────────────────────────
+  Phase 1: Design
+  ────────────────────────────────────────────
+  [ARC] Architect  I propose splitting server.js from index.js. The app...
+  [CHL] Challenger  Two real issues. No "main" in package.json -- npm st...
+  [ARC] Architect  Both valid. Adding start script, main field, and err...
+  [CHL] Challenger  Design approved. Error handling on the server instan...
 
-💻 Builder: Implemented. 4 files. server.js exports app without starting
-   it. index.js handles listen errors with actionable messages.
-   @Reviewer @Breaker: ready for review.
+  ────────────────────────────────────────────
+  Phase 2: Build
+  ────────────────────────────────────────────
+  [BLD] Builder  Implemented. 4 files. server.js exports app without...
+  4 files written
 
-🔍 Reviewer: LGTM. server.js/index.js split is correct. Error handling
-   on the server instance (not the app) is the right API. Ship it.
+  ────────────────────────────────────────────
+  Phase 3: Review
+  ────────────────────────────────────────────
+  [REV] Reviewer  LGTM. server.js/index.js split is correct. Error han...
+  [BRK] Breaker  Two real bugs. PORT=0 reports "port 0" instead of ac...
 
-🧪 Breaker: Two real bugs. PORT=0 — kernel assigns ephemeral port but
-   log reports "port 0" instead of actual port. PORT=99999 — throws
-   synchronous RangeError that bypasses the async error handler entirely.
+  DONE
 
-📊 5 agents · 5 messages · 1 revision · 2 bugs caught · 4 files · 70s
+  5 agents · 6 messages · 1 revision · 2 bugs caught · 4 files · 70s
 ```
-
-*Real output from `warroom run "Add a hello world Express server"`*
 
 ---
 
@@ -115,13 +119,13 @@ npx warroom run "Add user authentication with OAuth"
 
 ## The 5 Agents
 
-| | Agent | What it does | Optimizes for |
-|---|-------|-------------|---------------|
-| 🏗️ | **Architect** | Proposes designs, revises based on critique | Elegance and maintainability |
-| 😈 | **Challenger** | Finds gaps and edge cases, attacks every proposal | Robustness and completeness |
-| 💻 | **Builder** | Implements the agreed design | Simplicity and shipping |
-| 🔍 | **Reviewer** | Reviews code for bugs and quality issues | Quality and best practices |
-| 🧪 | **Breaker** | Tries to break everything with adversarial tests | Finding failures |
+| Agent | Tag | What it does | Optimizes for |
+|-------|-----|-------------|---------------|
+| **Architect** | `ARC` | Proposes designs, revises based on critique | Elegance and maintainability |
+| **Challenger** | `CHL` | Finds gaps and edge cases, attacks every proposal | Robustness and completeness |
+| **Builder** | `BLD` | Implements the agreed design | Simplicity and shipping |
+| **Reviewer** | `REV` | Reviews code for bugs and quality issues | Quality and best practices |
+| **Breaker** | `BRK` | Tries to break everything with adversarial tests | Finding failures |
 
 Each agent has a different objective function. They genuinely disagree. That's what makes the conversations interesting.
 
@@ -131,8 +135,8 @@ Each agent has a different objective function. They genuinely disagree. That's w
 
 ```
 .warroom/conversations/
-├── conversation.md    ← Full agent debate (shareable)
-└── summary.md         ← What was built, decisions made, bugs caught
+├── conversation.md    <- Full agent debate (shareable)
+└── summary.md         <- What was built, decisions made, bugs caught
 ```
 
 The conversation is the product. Screenshot it. Share it. Learn from it.
@@ -146,6 +150,7 @@ warroom run <task>       Assign a task to the agent team
 warroom setup            Authenticate (setup token or API key)
 warroom setup --login    Browser-based OAuth login
 warroom read             Read the latest conversation
+warroom read --format html   Export as standalone HTML
 warroom status           List all conversations
 ```
 

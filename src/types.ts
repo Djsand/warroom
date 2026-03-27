@@ -18,6 +18,14 @@ export const AGENT_LABEL: Record<AgentRole, string> = {
   breaker: "Breaker",
 };
 
+export const AGENT_TAG: Record<AgentRole, string> = {
+  architect: "ARC",
+  challenger: "CHL",
+  builder: "BLD",
+  reviewer: "REV",
+  breaker: "BRK",
+};
+
 export interface ConversationMessage {
   role: AgentRole;
   content: string;

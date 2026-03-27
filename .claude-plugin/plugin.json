@@ -8,6 +8,7 @@
   "homepage": "https://github.com/Djsand/warroom",
   "repository": "https://github.com/Djsand/warroom",
   "license": "MIT",
+  "skills": "./",
   "keywords": [
     "ai",
     "agents",

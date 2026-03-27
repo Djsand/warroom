@@ -53,7 +53,11 @@ program
     }
   });
 
-program.command("read").description("Read the latest conversation").action(() => handleRead());
+program
+  .command("read")
+  .description("Read the latest conversation")
+  .option("--format <format>", "Output format: md or html", "md")
+  .action((opts: { format: string }) => handleRead(opts.format as "md" | "html"));
 program.command("status").description("List all conversations").action(() => handleStatus());
 
 program.parse();

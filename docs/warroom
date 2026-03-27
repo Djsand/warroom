@@ -1,0 +1,4 @@
+#!/bin/bash
+# Fake warroom binary for demo recording — runs the simulated output
+cd "$(dirname "$0")/.." 2>/dev/null
+exec bash docs/demo-output.sh

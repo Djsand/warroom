@@ -9,7 +9,7 @@
 [![CI](https://github.com/Djsand/warroom/actions/workflows/ci.yml/badge.svg)](https://github.com/Djsand/warroom/actions/workflows/ci.yml)
 [![license](https://img.shields.io/github/license/Djsand/warroom)](LICENSE)
 
-<img src="docs/demo.gif" alt="warroom demo" width="640">
+<img src="docs/demo.gif" alt="warroom demo" width="800">
 
 </div>
 

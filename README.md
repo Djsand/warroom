@@ -1,8 +1,18 @@
+<div align="center">
+
 # warroom
 
-**5 AI agents enter the war room. They debate, build, and review your code.**
+### 5 AI agents enter the war room.
+### They debate, build, and review your code.
+
+[![npm](https://img.shields.io/npm/v/warroom)](https://www.npmjs.com/package/warroom)
+[![license](https://img.shields.io/github/license/Djsand/warroom)](LICENSE)
+
+</div>
 
 ---
+
+> Give it a task. Five agents argue about the design, implement it, review each other's work, and try to break it. You get finished code **and a conversation showing exactly how they got there.**
 
 ```
 🏗️ Architect: I propose splitting server.js (app creation + routes) from
@@ -22,8 +32,7 @@
    @Reviewer @Breaker: ready for review.
 
 🔍 Reviewer: LGTM. server.js/index.js split is correct. Error handling
-   on the server instance (not the app) is the right API. PORT env var
-   handled correctly. Ship it.
+   on the server instance (not the app) is the right API. Ship it.
 
 🧪 Breaker: Two real bugs. PORT=0 — kernel assigns ephemeral port but
    log reports "port 0" instead of actual port. PORT=99999 — throws
@@ -36,96 +45,121 @@
 
 ---
 
-## Quick start
+## Install
 
-### Claude Code plugin (no API key needed)
+### Claude Code plugin (recommended)
 
 ```bash
-claude plugin install https://github.com/Djsand/warroom
+claude plugin marketplace add https://github.com/Djsand/warroom
+claude plugin install warroom
 ```
+
+Then:
 
 ```
 /warroom "Add user authentication with OAuth"
 ```
 
+No API key needed. Uses your Claude Code subscription.
+
 ### Standalone CLI
 
 ```bash
-# Option 1: Setup token (uses your Claude subscription)
-warroom setup --token $(claude setup-token)
+npx warroom setup --token $(claude setup-token)
+npx warroom run "Add user authentication with OAuth"
+```
 
-# Option 2: API key
+Or with an API key:
+
+```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-
-# Run
-warroom run "Add user authentication with OAuth"
+npx warroom run "Add user authentication with OAuth"
 ```
-
-### What you get
-
-```
-.warroom/conversations/
-  conversation.md   # Full agent debate (the viral artifact)
-  summary.md        # Decisions, trade-offs, bugs caught
-```
-
-Plus code written to your project directory.
 
 ---
 
 ## How it works
 
-1. **Design** — Architect proposes. Challenger attacks. They debate until the design holds.
-2. **Build** — Builder implements the agreed design. Writes real files.
-3. **Review** — Reviewer checks quality. Breaker tries to break it.
-4. **Finalize** — Conversation and summary saved. Code ready to review.
+```
+         ┌─────────────┐
+         │  Your task   │
+         └──────┬───────┘
+                │
+    ┌───────────▼───────────┐
+    │   Phase 1: DESIGN     │  Architect proposes.
+    │   Architect + Challenger  Challenger attacks.
+    │   debate 2-4 rounds   │  They revise until
+    │                       │  the design holds.
+    └───────────┬───────────┘
+                │
+    ┌───────────▼───────────┐
+    │   Phase 2: BUILD      │  Builder implements
+    │   Builder writes code │  the agreed design.
+    └───────────┬───────────┘
+                │
+    ┌───────────▼───────────┐
+    │   Phase 3: REVIEW     │  Reviewer checks quality.
+    │   Reviewer + Breaker  │  Breaker tries to
+    │   examine the code    │  break everything.
+    └───────────┬───────────┘
+                │
+    ┌───────────▼───────────┐
+    │   Phase 4: FINALIZE   │  conversation.md
+    │   Save conversation   │  summary.md
+    │   and summary         │  code on branch
+    └───────────────────────┘
+```
 
 ---
 
-## The 5 agents
+## The 5 Agents
 
-| Agent | Role | Optimizes for |
-|-------|------|---------------|
-| 🏗️ Architect | Proposes designs, revises based on critique | Elegance and maintainability |
-| 😈 Challenger | Finds gaps, edge cases, attacks every proposal | Robustness and completeness |
-| 💻 Builder | Implements the agreed design | Simplicity and shipping |
-| 🔍 Reviewer | Reviews code for bugs and quality | Quality and best practices |
-| 🧪 Breaker | Tries to break everything with adversarial scenarios | Finding failures |
+| | Agent | What it does | Optimizes for |
+|---|-------|-------------|---------------|
+| 🏗️ | **Architect** | Proposes designs, revises based on critique | Elegance and maintainability |
+| 😈 | **Challenger** | Finds gaps and edge cases, attacks every proposal | Robustness and completeness |
+| 💻 | **Builder** | Implements the agreed design | Simplicity and shipping |
+| 🔍 | **Reviewer** | Reviews code for bugs and quality issues | Quality and best practices |
+| 🧪 | **Breaker** | Tries to break everything with adversarial tests | Finding failures |
 
-Each agent has a different objective. They genuinely disagree. That's what makes the conversations interesting.
+Each agent has a different objective function. They genuinely disagree. That's what makes the conversations interesting.
 
 ---
 
-## Authentication (standalone CLI)
+## What you get
 
-The plugin mode needs no configuration.
-
-```bash
-# Recommended: use your Claude subscription
-warroom setup --token <paste from `claude setup-token`>
-
-# Or: direct API key
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Or: browser login
-warroom setup --login
+```
+.warroom/conversations/
+├── conversation.md    ← Full agent debate (shareable)
+└── summary.md         ← What was built, decisions made, bugs caught
 ```
 
-```bash
-# Optional model override
-export WARROOM_ARCHITECT_MODEL=claude-sonnet-4-6
-export WARROOM_AGENT_MODEL=claude-sonnet-4-6
-```
+The conversation is the product. Screenshot it. Share it. Learn from it.
 
 ---
 
 ## Commands
 
 ```
-warroom run <task>      Assign a task to the agent team
-warroom setup           Authenticate (setup token, API key, or browser)
-warroom read            Read the latest conversation
-warroom status          List all conversations
+warroom run <task>       Assign a task to the agent team
+warroom setup            Authenticate (setup token or API key)
+warroom setup --login    Browser-based OAuth login
+warroom read             Read the latest conversation
+warroom status           List all conversations
+```
+
+---
+
+## Auth (standalone only)
+
+The plugin mode needs no configuration.
+
+```bash
+# Use your Claude subscription (recommended)
+warroom setup --token <paste from `claude setup-token`>
+
+# Or use an API key
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ---

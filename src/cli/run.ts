@@ -4,6 +4,11 @@ import chalk from "chalk";
 import { runGaps, slugify, formatDate } from "../orchestrator/run.js";
 import { loadConfig } from "../config.js";
 
+const BANNER = `
+  ${chalk.bold.red("W A R R O O M")}
+  ${chalk.dim("5 agents. 1 task. Let the debate begin.")}
+`;
+
 export async function handleRun(task: string): Promise<void> {
   const config = loadConfig();
   const projectDir = process.cwd();
@@ -32,9 +37,10 @@ export async function handleRun(task: string): Promise<void> {
     }
   }
 
-  console.log(chalk.bold.green("warroom starting..."));
-  console.log(chalk.dim(`Task:        ${task}`));
-  console.log(chalk.dim(`Project dir: ${projectDir}`));
+  console.log(BANNER);
+  console.log(chalk.bold(`  Task: ${task}`));
+  console.log(chalk.dim(`  Dir:  ${projectDir}`));
+  console.log("");
 
   const result = await runGaps({
     task,
@@ -47,7 +53,7 @@ export async function handleRun(task: string): Promise<void> {
     maxReviewRounds: config.maxReviewRounds,
   });
 
-  // Write conversation.md and summary.md to .warroom/conversations/<slug>/
+  // Write conversation.md and summary.md
   const slug = `${slugify(task)}-${formatDate(result.startedAt)}`;
   const convDir = path.join(projectDir, ".warroom", "conversations", slug);
   fs.mkdirSync(convDir, { recursive: true });
@@ -58,18 +64,20 @@ export async function handleRun(task: string): Promise<void> {
   fs.writeFileSync(conversationPath, result.conversationMd, "utf-8");
   fs.writeFileSync(summaryPath, result.summaryMd, "utf-8");
 
-  // Print results
+  // Results
   const { stats } = result;
-  const durationSec = (stats.durationMs / 1000).toFixed(1);
+  const durationSec = (stats.durationMs / 1000).toFixed(0);
 
   console.log("");
-  console.log(chalk.bold.green("Done!"));
-  console.log(chalk.dim(`Messages:      ${stats.totalMessages}`));
-  console.log(chalk.dim(`Revisions:     ${stats.designRevisions}`));
-  console.log(chalk.dim(`Bugs found:    ${stats.bugsCaught}`));
-  console.log(chalk.dim(`Files changed: ${stats.filesChanged}`));
-  console.log(chalk.dim(`Duration:      ${durationSec}s`));
+  console.log(chalk.bold.green("  MISSION COMPLETE"));
   console.log("");
-  console.log(chalk.dim(`Conversation:  ${conversationPath}`));
-  console.log(chalk.dim(`Summary:       ${summaryPath}`));
+  console.log(`  ${chalk.white("Messages")}     ${stats.totalMessages}`);
+  console.log(`  ${chalk.white("Revisions")}    ${stats.designRevisions}`);
+  console.log(`  ${chalk.white("Bugs caught")}  ${stats.bugsCaught}`);
+  console.log(`  ${chalk.white("Files")}        ${stats.filesChanged}`);
+  console.log(`  ${chalk.white("Duration")}     ${durationSec}s`);
+  console.log("");
+  console.log(`  ${chalk.cyan(conversationPath)}`);
+  console.log(`  ${chalk.cyan(summaryPath)}`);
+  console.log("");
 }

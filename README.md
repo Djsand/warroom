@@ -6,6 +6,7 @@
 ### They debate, build, and review your code.
 
 [![npm](https://img.shields.io/npm/v/warroom)](https://www.npmjs.com/package/warroom)
+[![CI](https://github.com/Djsand/warroom/actions/workflows/ci.yml/badge.svg)](https://github.com/Djsand/warroom/actions/workflows/ci.yml)
 [![license](https://img.shields.io/github/license/Djsand/warroom)](LICENSE)
 
 </div>
@@ -161,6 +162,18 @@ warroom setup --token <paste from `claude setup-token`>
 # Or use an API key
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+---
+
+## Examples
+
+Real conversations from warroom sessions — each one shows the agents debating, catching bugs, and refining code:
+
+- [Express Server](examples/express-server.md) — 2 bugs caught in a simple hello world
+- [JWT Authentication](examples/auth-system.md) — 3 security issues found by Breaker
+- [CSV to JSON CLI](examples/cli-tool.md) — streaming architecture stress-tested
+
+Want to add your own? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

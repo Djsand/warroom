@@ -1,20 +1,8 @@
 import type { CodeChange, GapsAuth } from "../types.js";
 import { callAgent } from "../agents/call.js";
 import { getSystemPrompt } from "../agents/prompts.js";
-import { AGENT_EMOJI, AGENT_LABEL } from "../types.js";
-import type { AgentRole } from "../types.js";
 import type { Thread } from "../conversation/thread.js";
-
-function logAgent(role: AgentRole, content: string): void {
-  const emoji = AGENT_EMOJI[role];
-  const label = AGENT_LABEL[role];
-  const short = content.replace(/\n/g, " ").slice(0, 80);
-  console.log(`  ${emoji} ${label}: ${short}${content.length > 80 ? "..." : ""}`);
-}
-
-function logPhase(name: string): void {
-  console.log(`\n  --- ${name} ---\n`);
-}
+import { phaseHeader, waitingFor, doneAgent } from "../cli/ui.js";
 
 export interface PhaseConfig {
   auth: GapsAuth;
@@ -25,11 +13,11 @@ export interface PhaseConfig {
 }
 
 export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promise<void> {
-  logPhase("Phase 1: Design");
+  console.log(phaseHeader("Phase 1: Design"));
   const task = thread.task;
 
   for (let round = 0; round < config.maxRounds; round++) {
-    console.log(`  Waiting for Architect...`);
+    console.log(waitingFor("architect"));
     const architectResult = await callAgent({
       role: "architect",
       systemPrompt: getSystemPrompt("architect", task, config.projectContext),
@@ -38,10 +26,10 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       model: config.architectModel,
     });
     thread.add({ role: "architect", content: architectResult.content, phase: "design" });
-    logAgent("architect", architectResult.content);
+    console.log(doneAgent("architect", architectResult.content));
 
     if (architectResult.content.toLowerCase().includes("@builder")) {
-      console.log(`  Waiting for Challenger (final review)...`);
+      console.log(waitingFor("challenger"));
       const challengerFinalResult = await callAgent({
         role: "challenger",
         systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
@@ -50,11 +38,11 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
         model: config.agentModel,
       });
       thread.add({ role: "challenger", content: challengerFinalResult.content, phase: "design" });
-      logAgent("challenger", challengerFinalResult.content);
+      console.log(doneAgent("challenger", challengerFinalResult.content));
       break;
     }
 
-    console.log(`  Waiting for Challenger...`);
+    console.log(waitingFor("challenger"));
     const challengerResult = await callAgent({
       role: "challenger",
       systemPrompt: getSystemPrompt("challenger", task, config.projectContext),
@@ -63,15 +51,15 @@ export async function runDesignPhase(thread: Thread, config: PhaseConfig): Promi
       model: config.agentModel,
     });
     thread.add({ role: "challenger", content: challengerResult.content, phase: "design" });
-    logAgent("challenger", challengerResult.content);
+    console.log(doneAgent("challenger", challengerResult.content));
 
     if (challengerResult.content.toLowerCase().includes("design approved")) break;
   }
 }
 
 export async function runBuildPhase(thread: Thread, config: PhaseConfig): Promise<CodeChange[]> {
-  logPhase("Phase 2: Build");
-  console.log(`  Waiting for Builder...`);
+  console.log(phaseHeader("Phase 2: Build"));
+  console.log(waitingFor("builder"));
   const builderResult = await callAgent({
     role: "builder",
     systemPrompt: getSystemPrompt("builder", thread.task, config.projectContext),
@@ -82,15 +70,16 @@ export async function runBuildPhase(thread: Thread, config: PhaseConfig): Promis
     model: config.agentModel,
   });
   thread.add({ role: "builder", content: builderResult.content, phase: "build", codeChanges: builderResult.codeChanges });
-  logAgent("builder", builderResult.content);
-  console.log(`  Files: ${builderResult.codeChanges.length}`);
+  console.log(doneAgent("builder", builderResult.content));
+  const fileCount = builderResult.codeChanges.length;
+  console.log(`  ${fileCount} file${fileCount === 1 ? "" : "s"} written`);
   return builderResult.codeChanges;
 }
 
 export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promise<boolean> {
-  logPhase("Phase 3: Review");
+  console.log(phaseHeader("Phase 3: Review"));
 
-  console.log(`  Waiting for Reviewer...`);
+  console.log(waitingFor("reviewer"));
   const reviewerResult = await callAgent({
     role: "reviewer",
     systemPrompt: getSystemPrompt("reviewer", thread.task, config.projectContext),
@@ -99,9 +88,9 @@ export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promi
     model: config.agentModel,
   });
   thread.add({ role: "reviewer", content: reviewerResult.content, phase: "review" });
-  logAgent("reviewer", reviewerResult.content);
+  console.log(doneAgent("reviewer", reviewerResult.content));
 
-  console.log(`  Waiting for Breaker...`);
+  console.log(waitingFor("breaker"));
   const breakerResult = await callAgent({
     role: "breaker",
     systemPrompt: getSystemPrompt("breaker", thread.task, config.projectContext),
@@ -110,7 +99,7 @@ export async function runReviewPhase(thread: Thread, config: PhaseConfig): Promi
     model: config.agentModel,
   });
   thread.add({ role: "breaker", content: breakerResult.content, phase: "review" });
-  logAgent("breaker", breakerResult.content);
+  console.log(doneAgent("breaker", breakerResult.content));
 
   const reviewerApproved = reviewerResult.content.toLowerCase().includes("lgtm");
   const breakerApproved = breakerResult.content.toLowerCase().includes("passed");

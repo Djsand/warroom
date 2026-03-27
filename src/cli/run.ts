@@ -4,11 +4,7 @@ import chalk from "chalk";
 import { runGaps, slugify, formatDate } from "../orchestrator/run.js";
 import { loadConfig } from "../config.js";
 import type { ConversationStats, ConversationMessage } from "../types.js";
-
-const BANNER = `
-  ${chalk.bold.red("W A R R O O M")}
-  ${chalk.dim("5 agents. 1 task. Let the debate begin.")}
-`;
+import { banner, missionComplete, statsLine, fileLine } from "./ui.js";
 
 export function formatStats(stats: ConversationStats, messages: readonly ConversationMessage[]): string {
   const agentCount = new Set(messages.map((m) => m.role)).size;
@@ -23,7 +19,7 @@ export function formatStats(stats: ConversationStats, messages: readonly Convers
     `${durationSec}s`,
   ];
 
-  return `\u{1F4CA} ${parts.join(chalk.dim(" \u00B7 "))}`;
+  return statsLine(parts);
 }
 
 export async function handleRun(task: string): Promise<void> {
@@ -54,9 +50,8 @@ export async function handleRun(task: string): Promise<void> {
     }
   }
 
-  console.log(BANNER);
-  console.log(chalk.bold(`  Task: ${task}`));
-  console.log(chalk.dim(`  Dir:  ${projectDir}`));
+  console.log(banner());
+  console.log(`  ${chalk.bold("Task:")} ${task}`);
   console.log("");
 
   const result = await runGaps({
@@ -83,11 +78,11 @@ export async function handleRun(task: string): Promise<void> {
 
   // Results
   console.log("");
-  console.log(chalk.bold.green("  MISSION COMPLETE"));
+  console.log(missionComplete());
   console.log("");
-  console.log(`  ${formatStats(result.stats, result.messages)}`);
+  console.log(formatStats(result.stats, result.messages));
   console.log("");
-  console.log(`  ${chalk.cyan(conversationPath)}`);
-  console.log(`  ${chalk.cyan(summaryPath)}`);
+  console.log(fileLine(conversationPath));
+  console.log(fileLine(summaryPath));
   console.log("");
 }

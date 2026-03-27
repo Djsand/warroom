@@ -8,112 +8,105 @@
 
 ```
 src/
-  App.jsx           — root component, manages todo state
+  App.tsx          — root component, renders TodoList
   components/
-    TodoList.jsx    — renders list of TodoItem components
-    TodoItem.jsx    — single todo with toggle and delete
-    TodoInput.jsx   — controlled input for adding todos
+    TodoList.tsx   — manages state, syncs to localStorage
+    TodoItem.tsx   — single todo with toggle/delete
+    AddTodo.tsx    — input form
   hooks/
-    useLocalStorage.js — custom hook: syncs state to localStorage
+    useLocalStorage.ts — generic hook for localStorage-backed state
 ```
 
 Key decisions:
-- `useLocalStorage` hook wraps `useState` with read/write to `localStorage`
-- Todos stored as `{ id, text, completed, createdAt }`
-- IDs generated with `crypto.randomUUID()`
-- All state mutations return new arrays (immutable updates)
+- `useLocalStorage` hook handles serialization/deserialization
+- State lives in `TodoList`, not App — keeps App as a thin shell
+- No external state library — `useState` + custom hook is sufficient for this scope
+- Optimistic UI: state updates immediately, localStorage writes async via `useEffect`
 
 @Challenger: thoughts?
 
 ---
 
-😈 **Challenger**: Three real problems:
+😈 **Challenger**: Three issues, one is subtle:
 
-1. **Race condition on mount.** `useLocalStorage` likely reads from localStorage in an initializer, then writes back on every change via `useEffect`. But if two tabs are open, tab A writes, tab B's effect fires with stale state, and tab B overwrites tab A's changes. No cross-tab sync at all.
+1. **Stale closure in useEffect.** If `useLocalStorage` uses `useEffect(() => localStorage.setItem(key, JSON.stringify(value)), [value])`, the effect captures a stale `key` if the key ever changes. The dependency array needs `[key, value]`.
 
-2. **No cleanup in useEffect.** If the hook uses `useEffect` to write to localStorage on state change, and the component unmounts mid-write (React 18 strict mode double-mounts in dev), you get writes from a stale closure. The hook needs a cleanup function or at minimum a ref to track the current value.
+2. **No error handling on `JSON.parse`.** If localStorage contains corrupted data (user manually edited it, different app wrote to the same key), `JSON.parse` throws and the entire component crashes. Need a try/catch with fallback to the initial value.
 
-3. **`crypto.randomUUID()` is not available in all browsers.** It requires a secure context (HTTPS) and is missing in older browsers. For a todo app, `Date.now().toString(36) + Math.random().toString(36).slice(2)` is sufficient and universally supported.
+3. **Race condition with multiple tabs.** User opens two tabs, adds a todo in tab A, then adds a todo in tab B. Tab B overwrites tab A's changes because it read stale state on mount. Need a `storage` event listener to sync across tabs.
+
+Issue 3 is the most interesting — most todo app tutorials ignore it entirely, and users hit it immediately.
 
 ---
 
 🏗️ **Architect**: All valid. Revisions:
 
-1. Add a `storage` event listener in `useLocalStorage` to sync across tabs. When another tab writes, the listener updates local state without triggering a write-back loop.
-2. Use a ref to track the latest value. The `useEffect` cleanup checks whether the component is still mounted before writing. Also: write synchronously in the setter function rather than in an effect — eliminates the stale closure problem entirely.
-3. Switch to `Date.now()` + random suffix for IDs. No crypto dependency.
+1. Dependency array: `[key, value]` — straightforward fix
+2. `JSON.parse` wrapped in try/catch, falls back to `initialValue` and logs a warning
+3. Add `window.addEventListener('storage', handler)` in the hook that updates state when another tab writes to the same key. Important: the `storage` event only fires in *other* tabs, not the one that wrote — so no infinite loop risk.
 
-@Builder: proceed with revised spec.
+One constraint on the cross-tab sync: it replaces local state entirely with the remote value. If both tabs modify at the same time, last-write-wins. For a todo app, that's acceptable. For a collaborative editor, it wouldn't be.
+
+@Builder: proceed.
 
 ---
 
-💻 **Builder**: Implemented. 5 files, 160 lines total.
+💻 **Builder**: Implemented. 5 files.
 
-**hooks/useLocalStorage.js**
-```javascript
+**src/hooks/useLocalStorage.ts**
+```typescript
 import { useState, useEffect, useCallback } from 'react';
 
-function useLocalStorage(key, initialValue) {
-  const [storedValue, setStoredValue] = useState(() => {
+export function useLocalStorage<T>(key: string, initialValue: T) {
+  const [value, setValue] = useState<T>(() => {
     try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : initialValue;
     } catch {
+      console.warn(`Failed to parse localStorage key "${key}", using default`);
       return initialValue;
     }
   });
 
-  const setValue = useCallback((value) => {
-    setStoredValue((prev) => {
-      const nextValue = value instanceof Function ? value(prev) : value;
-      window.localStorage.setItem(key, JSON.stringify(nextValue));
-      return nextValue;
-    });
-  }, [key]);
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
 
   useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === key) {
-        setStoredValue(e.newValue ? JSON.parse(e.newValue) : initialValue);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === key && e.newValue !== null) {
+        try {
+          setValue(JSON.parse(e.newValue));
+        } catch {
+          // Ignore corrupted cross-tab data
+        }
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [key, initialValue]);
+  }, [key]);
 
-  return [storedValue, setValue];
+  return [value, setValue] as const;
 }
 ```
 
-**App.jsx**
-```javascript
-function App() {
-  const [todos, setTodos] = useLocalStorage('todos', []);
+**src/components/TodoItem.tsx**
+```typescript
+interface TodoItemProps {
+  id: string;
+  text: string;
+  completed: boolean;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+}
 
-  const addTodo = (text) => {
-    setTodos((prev) => [...prev, {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-      text,
-      completed: false,
-      createdAt: new Date().toISOString(),
-    }]);
-  };
-
-  const toggleTodo = (id) => {
-    setTodos((prev) => prev.map((todo) =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
-  };
-
-  const deleteTodo = (id) => {
-    setTodos((prev) => prev.filter((todo) => todo.id !== id));
-  };
-
+export function TodoItem({ id, text, completed, onToggle, onDelete }: TodoItemProps) {
   return (
-    <div>
-      <TodoInput onAdd={addTodo} />
-      <TodoList todos={todos} onToggle={toggleTodo} onDelete={deleteTodo} />
-    </div>
+    <li style={{ textDecoration: completed ? 'line-through' : 'none' }}>
+      <input type="checkbox" checked={completed} onChange={() => onToggle(id)} />
+      <span>{text}</span>
+      <button onClick={() => onDelete(id)}>Delete</button>
+    </li>
   );
 }
 ```
@@ -122,27 +115,27 @@ function App() {
 
 ---
 
-🔍 **Reviewer**: Clean implementation. The synchronous write inside the setter callback is the right call — avoids the stale closure footgun entirely. Cross-tab sync via the `storage` event is correct.
+🔍 **Reviewer**: Mostly clean. Two issues:
 
-Two issues:
+1. **Missing `key` prop.** If `TodoList` renders `todos.map(todo => <TodoItem .../>)`, React will warn and re-render the entire list on every change. Need `key={todo.id}` on each `TodoItem`.
 
-1. **Missing `key` prop in TodoList.** The `map()` in TodoList must use `todo.id` as the key. If it uses array index, reordering or deleting causes React to mismatch component state with the wrong todo. This is a real bug — toggling a todo could toggle the wrong one after a deletion.
+2. **`id` generation.** Using `Date.now()` for IDs means two rapid additions get the same ID. Use `crypto.randomUUID()` instead — it's available in all modern browsers and guaranteed unique.
 
-2. **`initialValue` in the storage event handler dependency array.** If `initialValue` is an object literal (like `[]`), a new reference is created every render, causing the effect to re-run infinitely. Either memoize it in the parent or use a ref inside the hook.
-
-Issue 1 is a bug. Issue 2 is a latent bug that triggers when the hook is used with object defaults.
+Both are standard React mistakes. Fix them and it's shippable.
 
 ---
 
-🧪 **Breaker**: Stress-testing localStorage:
+🧪 **Breaker**: Testing edge cases:
 
-1. **localStorage is full.** `window.localStorage.setItem` throws `QuotaExceededError` when storage is full (~5MB). The `setValue` function calls `setItem` inside the state updater but has no try/catch. Result: the state update succeeds (React state changes) but the write fails silently. On next page load, the old data loads — the user's changes are lost with no error message. Fix: wrap `setItem` in try/catch, surface error to the user.
+1. **localStorage full (QuotaExceededError).** When storage hits the 5MB limit, `localStorage.setItem` throws. The current code has no try/catch around the write — the component crashes and loses the in-memory state too. Fix: wrap setItem in try/catch, show a warning toast, keep in-memory state intact.
 
-2. **Corrupted localStorage.** If another script writes invalid JSON to the `todos` key, `JSON.parse` throws on mount. The initializer catches this and falls back to `initialValue` — good. But the storage event handler has `JSON.parse(e.newValue)` with no try/catch. A corrupted cross-tab write crashes the app.
+2. **`storage` event with `null` newValue.** Another tab calls `localStorage.removeItem(key)`. The current handler checks `e.newValue !== null` so it silently ignores the deletion — but the local tab still shows stale data. Should reset to `initialValue` when the key is removed.
 
-3. **Rapid toggling.** Clicking toggle 50 times in 1 second. Because `setValue` uses the functional updater pattern (`prev => ...`), each update sees the correct previous state. No bug here — the functional updater pattern is correct.
+3. **500 todos.** Rendering is fine, but `JSON.stringify` on every keystroke in the add form (because React re-renders) means serializing the entire array on every character. Not a crash, but noticeable lag. Could debounce the localStorage write or move it out of the render cycle.
 
-Bug 1 is critical — data loss with no feedback. Bug 2 crashes the app on corrupted external writes.
+4. **XSS via todo text.** If `text` contains `<script>`, React's JSX escaping handles it — confirmed safe. No issue.
+
+Bug 1 is the most critical — data loss on a full localStorage.
 
 ---
 

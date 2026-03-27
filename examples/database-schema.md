@@ -4,134 +4,111 @@
 
 ---
 
-🏗️ **Architect**: Proposed schema using shared-database, shared-schema with a `tenant_id` discriminator:
+🏗️ **Architect**: Proposed schema using shared-database, shared-schema with `tenant_id` discrimination:
 
 ```sql
-tenants
-  id            UUID PRIMARY KEY
-  name          VARCHAR(255) NOT NULL
-  slug          VARCHAR(63) UNIQUE NOT NULL
-  plan          VARCHAR(20) DEFAULT 'free'
-  created_at    TIMESTAMPTZ DEFAULT now()
+CREATE TABLE tenants (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  slug        TEXT NOT NULL UNIQUE,
+  plan        TEXT NOT NULL DEFAULT 'free',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-users
-  id            UUID PRIMARY KEY
-  tenant_id     UUID REFERENCES tenants(id)
-  email         VARCHAR(255) NOT NULL
-  password_hash VARCHAR(255) NOT NULL
-  role          VARCHAR(20) DEFAULT 'member'
-  created_at    TIMESTAMPTZ DEFAULT now()
+CREATE TABLE users (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  email       TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  role        TEXT NOT NULL DEFAULT 'member',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(tenant_id, email)
+);
 
-projects
-  id            UUID PRIMARY KEY
-  tenant_id     UUID REFERENCES tenants(id)
-  name          VARCHAR(255) NOT NULL
-  owner_id      UUID REFERENCES users(id)
-  created_at    TIMESTAMPTZ DEFAULT now()
+CREATE TABLE projects (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  name        TEXT NOT NULL,
+  created_by  UUID NOT NULL REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-tasks
-  id            UUID PRIMARY KEY
-  project_id    UUID REFERENCES projects(id)
-  title         VARCHAR(500) NOT NULL
-  status        VARCHAR(20) DEFAULT 'open'
-  assignee_id   UUID REFERENCES users(id)
-  created_at    TIMESTAMPTZ DEFAULT now()
+CREATE TABLE tasks (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
+  project_id  UUID NOT NULL REFERENCES projects(id),
+  title       TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open',
+  assigned_to UUID REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
 Key decisions:
-- Shared schema with `tenant_id` on every table — simpler ops than schema-per-tenant
-- UUIDs everywhere — no sequential ID leakage
-- Unique email scoped to tenant — same person can exist in multiple tenants
+- Every table has `tenant_id` — no joins needed for isolation
+- UUID primary keys — safe for distributed ID generation
+- `UNIQUE(tenant_id, email)` — same email can exist across tenants
+- No soft delete — keep it simple for v1
 
-@Challenger: attack this.
+@Challenger?
 
 ---
 
-😈 **Challenger**: Five issues, two critical:
+😈 **Challenger**: Four issues, two are critical:
 
 **CRITICAL:**
-1. **No row-level security (RLS).** Every query must include `WHERE tenant_id = ?` manually. One missed WHERE clause in any query and you have a cross-tenant data leak. This is the #1 multi-tenant vulnerability. Enable Postgres RLS with a policy that filters on `current_setting('app.tenant_id')`, set per-request.
+1. **No row-level security (RLS).** The schema relies entirely on application code to add `WHERE tenant_id = ?` to every query. One missed WHERE clause = cross-tenant data leak. With RLS, the database enforces isolation regardless of application bugs. This is the single most important security control in multi-tenant systems.
 
-2. **CASCADE deletes are missing — or worse, implicit.** If a tenant is deleted, what happens to their users, projects, and tasks? With no `ON DELETE` clause, Postgres defaults to `RESTRICT`, so deleting a tenant fails. But if someone adds `CASCADE` later to "fix" it, a single `DELETE FROM tenants` wipes all associated data instantly with no soft-delete recovery.
+2. **CASCADE on tenant delete is a nuke.** If `REFERENCES tenants(id)` gets `ON DELETE CASCADE` (even accidentally), deleting a tenant wipes all their users, projects, and tasks in a single statement. For a SaaS app, tenant deletion should be a multi-step process with a grace period, not a cascade.
 
 **Medium:**
-3. **No soft delete.** In a SaaS app, "delete" almost never means "destroy." Add `deleted_at TIMESTAMPTZ` columns and filter on `deleted_at IS NULL` in queries (or better, in the RLS policy).
+3. **No indexes on `tenant_id`.** Every query will filter by tenant_id. Without indexes, you're doing full table scans. On a shared table with 10k tenants, this matters immediately.
 
-4. **`tasks` has no `tenant_id`.** You're relying on joining through `projects` to get the tenant. This means every task query requires a join to projects just to enforce tenant isolation. Add `tenant_id` directly to `tasks` — denormalize for safety.
-
-5. **No `updated_at` anywhere.** Every table needs `updated_at TIMESTAMPTZ` for audit trails, conflict detection, and cache invalidation.
+4. **No `updated_at` column.** Every table needs it for sync, caching, and debugging. Adding it later requires a migration on every table.
 
 ---
 
-🏗️ **Architect**: All valid, especially the RLS point. Revisions:
+🏗️ **Architect**: All valid. Revisions:
 
-1. Enable RLS on all tenant-scoped tables. Policy: `USING (tenant_id = current_setting('app.tenant_id')::uuid)`. Application sets this per-request with `SET LOCAL app.tenant_id = ?` inside the transaction.
-2. Explicit `ON DELETE RESTRICT` on all foreign keys. Tenant deletion goes through a service that soft-deletes the tenant and all children in a transaction.
-3. Add `deleted_at TIMESTAMPTZ` to tenants, users, projects, tasks. RLS policy amended: `AND deleted_at IS NULL`.
-4. Add `tenant_id` to tasks with a foreign key to tenants. Denormalization is worth it for security.
-5. Add `updated_at TIMESTAMPTZ DEFAULT now()` with a trigger to auto-update on row modification.
+1. Enable RLS on all tables. Set policy: `USING (tenant_id = current_setting('app.tenant_id')::uuid)`. Application sets `SET LOCAL app.tenant_id = '...'` at the start of each request.
+2. No CASCADE on tenant FK. Default `RESTRICT` — application handles tenant deactivation with a `deactivated_at` column and a background job for cleanup after 30 days.
+3. Add `CREATE INDEX idx_{table}_tenant_id ON {table}(tenant_id)` for all tables. Composite indexes where needed (e.g., `(tenant_id, project_id)` on tasks).
+4. Add `updated_at TIMESTAMPTZ DEFAULT now()` to all tables with a trigger to auto-update.
 
-@Builder: create the migration.
+@Builder: proceed with the revised migration.
 
 ---
 
-💻 **Builder**: Migration SQL:
+💻 **Builder**: Implemented. Single migration file:
 
 ```sql
--- Enable UUID generation
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Enable RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
--- Tenants
-CREATE TABLE tenants (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        VARCHAR(255) NOT NULL,
-  slug        VARCHAR(63) UNIQUE NOT NULL,
-  plan        VARCHAR(20) NOT NULL DEFAULT 'free',
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at  TIMESTAMPTZ
-);
+-- Tenant isolation policies
+CREATE POLICY tenant_isolation ON users
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+CREATE POLICY tenant_isolation ON projects
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+CREATE POLICY tenant_isolation ON tasks
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
 
--- Users
-CREATE TABLE users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
-  email         VARCHAR(255) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  role          VARCHAR(20) NOT NULL DEFAULT 'member',
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at    TIMESTAMPTZ,
-  UNIQUE(tenant_id, email)
-);
+-- Indexes
+CREATE INDEX idx_users_tenant ON users(tenant_id);
+CREATE INDEX idx_projects_tenant ON projects(tenant_id);
+CREATE INDEX idx_tasks_tenant ON tasks(tenant_id);
+CREATE INDEX idx_tasks_tenant_project ON tasks(tenant_id, project_id);
+CREATE INDEX idx_tasks_tenant_assigned ON tasks(tenant_id, assigned_to);
 
--- Projects
-CREATE TABLE projects (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
-  name        VARCHAR(255) NOT NULL,
-  owner_id    UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at  TIMESTAMPTZ
-);
+-- Updated timestamps
+ALTER TABLE tenants ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE users ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE projects ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE tasks ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
 
--- Tasks
-CREATE TABLE tasks (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
-  project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
-  title       VARCHAR(500) NOT NULL,
-  status      VARCHAR(20) NOT NULL DEFAULT 'open',
-  assignee_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at  TIMESTAMPTZ
-);
-
--- Auto-update updated_at trigger
-CREATE OR REPLACE FUNCTION update_updated_at()
+CREATE OR REPLACE FUNCTION update_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -139,62 +116,40 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_tenants_updated_at BEFORE UPDATE ON tenants
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER trg_projects_updated_at BEFORE UPDATE ON projects
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER trg_tasks_updated_at BEFORE UPDATE ON tasks
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
--- Row-Level Security
-ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY tenant_isolation ON tenants
-  USING (id = current_setting('app.tenant_id')::uuid AND deleted_at IS NULL);
-CREATE POLICY tenant_isolation ON users
-  USING (tenant_id = current_setting('app.tenant_id')::uuid AND deleted_at IS NULL);
-CREATE POLICY tenant_isolation ON projects
-  USING (tenant_id = current_setting('app.tenant_id')::uuid AND deleted_at IS NULL);
-CREATE POLICY tenant_isolation ON tasks
-  USING (tenant_id = current_setting('app.tenant_id')::uuid AND deleted_at IS NULL);
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON tenants
+  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON projects
+  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 ```
 
 @Reviewer @Breaker: ready.
 
 ---
 
-🔍 **Reviewer**: Solid migration. RLS policies are correct, soft delete is built into the policies, triggers handle `updated_at`. The `ON DELETE RESTRICT` everywhere prevents accidental cascading destruction.
+🔍 **Reviewer**: Solid migration. One issue:
 
-One critical miss: **no indexes on `tenant_id` columns.** Every query hits the RLS policy, which filters on `tenant_id`. Without indexes, every row-level security check is a sequential scan. On tables with millions of rows, this turns every query into a full table scan.
+The RLS policies only have `USING` (which controls SELECT/UPDATE/DELETE). They're missing `WITH CHECK` (which controls INSERT). Without `WITH CHECK`, a user in tenant A could potentially INSERT a row with `tenant_id` pointing to tenant B. Add `WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid)` to each policy.
 
-Add:
-```sql
-CREATE INDEX idx_users_tenant ON users(tenant_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_projects_tenant ON projects(tenant_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_tasks_tenant ON tasks(tenant_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_tasks_project ON tasks(project_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_tasks_assignee ON tasks(assignee_id) WHERE deleted_at IS NULL;
-```
-
-Partial indexes with `WHERE deleted_at IS NULL` match the RLS policy, so Postgres can use them directly. This is not a nitpick — it is a performance cliff that appears only after the table grows past a few thousand rows.
+Everything else is correct. The trigger approach for `updated_at` is standard. Indexes look right.
 
 ---
 
-🧪 **Breaker**: Attacking tenant isolation:
+🧪 **Breaker**: Testing attack scenarios:
 
-1. **Forgot to SET tenant_id.** If the application code forgets `SET LOCAL app.tenant_id = ?` before a query, `current_setting('app.tenant_id')` throws an error (setting does not exist). The query fails hard — which is actually the correct behavior. Fail-closed. But the error message leaks implementation details to the client. Fix: add `current_setting('app.tenant_id', true)` (the `true` makes it return NULL instead of throwing) and change the policy to `USING (... AND current_setting('app.tenant_id', true) IS NOT NULL)`.
+1. **Superuser bypasses RLS.** If the application connects as a superuser (or the table owner), RLS is silently skipped. Verify the app uses a non-owner role. Fix: `ALTER TABLE ... FORCE ROW LEVEL SECURITY` to enforce even for table owners.
 
-2. **Superuser bypasses RLS.** The database owner and any role with `BYPASSRLS` attribute ignores all row-level security policies. If the application connects as the database owner (common in development), RLS provides zero protection. Fix: create a dedicated `app_user` role without `BYPASSRLS` and connect as that role. Add `FORCE ROW LEVEL SECURITY` on each table to apply RLS even to table owners.
+2. **Cross-tenant reference via foreign key.** `tasks.assigned_to` references `users(id)` — but nothing prevents assigning a task to a user in a *different* tenant. A composite FK `REFERENCES users(tenant_id, id)` would enforce this at the database level, but requires a unique constraint on `(tenant_id, id)` in users. Worth the migration complexity.
 
-3. **Cross-tenant data via assignee_id.** The `assignee_id` foreign key references `users(id)` with no tenant check. A task in tenant A can reference a user in tenant B. The FK constraint only checks that the user exists, not that they share a tenant. Fix: make the FK a composite reference `(tenant_id, assignee_id)` referencing `(tenant_id, id)` on users, which requires a unique constraint on `users(tenant_id, id)`.
+3. **`current_setting` with unset variable.** If the application forgets to `SET app.tenant_id`, `current_setting()` throws. This is actually *good* — fail-closed. But add `current_setting('app.tenant_id', true)` to return NULL instead of erroring, then add `AND tenant_id IS NOT NULL` to the policy. This way a missing tenant_id returns zero rows instead of crashing.
 
-Bug 3 is a cross-tenant data leak — the exact class of vulnerability the schema was designed to prevent.
+4. **Tenant slug enumeration.** `slugs` are unique and in a non-RLS table. An attacker can probe `SELECT slug FROM tenants WHERE slug = 'competitor'` to discover which companies use the platform. Consider whether this matters for your threat model.
+
+Bug 1 is critical — most ORMs connect as the table owner by default.
 
 ---
 
-📊 **5 agents** · 6 messages · 1 revision · 4 bugs caught · 1 migration file · 110s
+📊 **5 agents** · 6 messages · 2 revisions · 4 bugs caught · 1 file · 110s

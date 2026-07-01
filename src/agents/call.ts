@@ -1,25 +1,25 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AgentRole, CodeChange, GapsAuth } from "../types.js";
+import {
+  extractCodeChanges,
+  type CallAgentInput,
+  type CallAgentResult,
+} from "./shared.js";
+import { callCodexAgent } from "./codex-provider.js";
 
-export interface CallAgentInput {
-  role: AgentRole;
-  systemPrompt: string;
-  conversationContext: string;
-  auth: GapsAuth;
-  model: string;
-}
-
-export interface CallAgentResult {
-  content: string;
-  codeChanges: CodeChange[];
-  tokensUsed: number;
-}
+export type { CallAgentInput, CallAgentResult } from "./shared.js";
 
 function isOAuthToken(token: string): boolean {
   return token.includes("sk-ant-oat");
 }
 
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
+  if (input.auth.provider === "codex") {
+    return callCodexAgent(input);
+  }
+  return callAnthropicAgent(input);
+}
+
+async function callAnthropicAgent(input: CallAgentInput): Promise<CallAgentResult> {
   let client: Anthropic;
 
   if (isOAuthToken(input.auth.token)) {
@@ -65,18 +65,4 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
     (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
 
   return { content: textContent, codeChanges, tokensUsed };
-}
-
-function extractCodeChanges(text: string): CodeChange[] {
-  const changes: CodeChange[] = [];
-  const fileBlockRegex = /FILE:\s*([\w/.\\-]+)\s*\n```[\w]*\n([\s\S]*?)```/g;
-  let match;
-  while ((match = fileBlockRegex.exec(text)) !== null) {
-    changes.push({
-      filePath: match[1].trim(),
-      content: match[2].trim(),
-      action: "create",
-    });
-  }
-  return changes;
 }

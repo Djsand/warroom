@@ -3,22 +3,34 @@ import { Command } from "commander";
 import { handleRun } from "./cli/run.js";
 import { handleRead } from "./cli/read.js";
 import { handleStatus } from "./cli/status.js";
-import { handleSetup, handleSetupLogin, handleSetupWithToken, handleSetupReset } from "./cli/setup.js";
+import {
+  handleSetup,
+  handleSetupLogin,
+  handleSetupWithToken,
+  handleSetupReset,
+  handleCodexLogin,
+} from "./cli/setup.js";
+import type { ProviderChoice } from "./config.js";
 
 const program = new Command();
 
 program
   .name("warroom")
   .description("5 AI agents enter the war room. They debate, build, and review your code.")
-  .version("0.1.0");
+  .version("0.2.0");
 
 program
   .command("run")
   .description("Assign a task to the agent team")
   .argument("<task>", "The task to accomplish")
-  .action(async (task: string) => {
+  .option("--provider <provider>", "Model backend: anthropic, codex, or auto", "auto")
+  .option("--versus", "Cross-model debate: Claude vs GPT (needs both authenticated)")
+  .action(async (task: string, opts: { provider?: string; versus?: boolean }) => {
     try {
-      await handleRun(task);
+      await handleRun(task, {
+        provider: normalizeProvider(opts.provider),
+        versus: opts.versus,
+      });
     } catch (err: unknown) {
       if (err && typeof err === "object" && "status" in err) {
         const apiErr = err as Record<string, unknown>;
@@ -36,13 +48,15 @@ program
 
 program
   .command("setup")
-  .description("Authenticate with your Claude subscription or API key")
+  .description("Authenticate with Claude, ChatGPT/Codex, or an API key")
   .option("--login", "Login via browser (opens Anthropic OAuth)")
+  .option("--codex-login", "Login via browser (opens ChatGPT/Codex OAuth)")
   .option("--token <token>", "Provide a setup token from `claude setup-token`")
-  .option("--reset", "Clear stored credentials")
-  .action(async (opts: { login?: boolean; token?: string; reset?: boolean }) => {
+  .option("--reset", "Clear stored Claude credentials")
+  .action(async (opts: { login?: boolean; codexLogin?: boolean; token?: string; reset?: boolean }) => {
     try {
       if (opts.reset) return await handleSetupReset();
+      if (opts.codexLogin) return await handleCodexLogin();
       if (opts.login) return await handleSetupLogin();
       if (opts.token) return await handleSetupWithToken(opts.token);
       await handleSetup();
@@ -59,5 +73,12 @@ program
   .option("--format <format>", "Output format: md or html", "md")
   .action((opts: { format: string }) => handleRead(opts.format as "md" | "html"));
 program.command("status").description("List all conversations").action(() => handleStatus());
+
+function normalizeProvider(value?: string): ProviderChoice {
+  const v = (value ?? "auto").toLowerCase();
+  if (v === "anthropic" || v === "claude") return "anthropic";
+  if (v === "codex" || v === "openai" || v === "chatgpt" || v === "gpt") return "codex";
+  return "auto";
+}
 
 program.parse();

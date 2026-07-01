@@ -9,6 +9,7 @@ import {
   handleSetupWithToken,
   handleSetupReset,
   handleCodexLogin,
+  handleGlmKey,
 } from "./cli/setup.js";
 import type { ProviderChoice } from "./config.js";
 
@@ -23,8 +24,8 @@ program
   .command("run")
   .description("Assign a task to the agent team")
   .argument("<task>", "The task to accomplish")
-  .option("--provider <provider>", "Model backend: anthropic, codex, or auto", "auto")
-  .option("--versus", "Cross-model debate: Claude vs GPT (needs both authenticated)")
+  .option("--provider <provider>", "Model backend: anthropic, glm, codex, or auto", "auto")
+  .option("--versus", "Cross-model debate across two providers (needs two authenticated)")
   .action(async (task: string, opts: { provider?: string; versus?: boolean }) => {
     try {
       await handleRun(task, {
@@ -51,11 +52,13 @@ program
   .description("Authenticate with Claude, ChatGPT/Codex, or an API key")
   .option("--login", "Login via browser (opens Anthropic OAuth)")
   .option("--codex-login", "Login via browser (opens ChatGPT/Codex OAuth)")
+  .option("--glm-key <key>", "Store a Z.ai GLM coding-plan API key")
   .option("--token <token>", "Provide a setup token from `claude setup-token`")
   .option("--reset", "Clear stored Claude credentials")
-  .action(async (opts: { login?: boolean; codexLogin?: boolean; token?: string; reset?: boolean }) => {
+  .action(async (opts: { login?: boolean; codexLogin?: boolean; glmKey?: string; token?: string; reset?: boolean }) => {
     try {
       if (opts.reset) return await handleSetupReset();
+      if (opts.glmKey) return await handleGlmKey(opts.glmKey);
       if (opts.codexLogin) return await handleCodexLogin();
       if (opts.login) return await handleSetupLogin();
       if (opts.token) return await handleSetupWithToken(opts.token);
@@ -78,6 +81,7 @@ function normalizeProvider(value?: string): ProviderChoice {
   const v = (value ?? "auto").toLowerCase();
   if (v === "anthropic" || v === "claude") return "anthropic";
   if (v === "codex" || v === "openai" || v === "chatgpt" || v === "gpt") return "codex";
+  if (v === "glm" || v === "zai" || v === "z.ai" || v === "zhipu") return "glm";
   return "auto";
 }
 

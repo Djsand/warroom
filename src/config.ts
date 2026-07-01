@@ -4,6 +4,7 @@ import {
   resolveCodexAccessToken,
   readCodexModelPrefs,
 } from "./auth/codex.js";
+import { resolveGlmAuth } from "./auth/glm.js";
 import { assignVersusRoles } from "./orchestrator/versus.js";
 import type { GapsConfig, GapsAuth, Provider, VersusConfig } from "./types.js";
 
@@ -18,6 +19,9 @@ export interface LoadConfigOptions {
 
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
+/** Order tried in "auto" mode and when picking a cross-model opponent. */
+const PROVIDER_ORDER: Provider[] = ["anthropic", "glm", "codex"];
+
 interface ResolvedProvider {
   auth: GapsAuth;
   provider: Provider;
@@ -29,16 +33,15 @@ interface ResolvedProvider {
  * Resolve authentication and models.
  *
  * Detection order in "auto" mode:
- *   1. ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN env vars
- *   2. ~/.warroom/credentials.json (from `warroom setup`)
+ *   1. ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN env, or ~/.warroom (Claude)
+ *   2. ZAI_API_KEY env, or ~/.warroom/glm.json (Z.ai GLM coding plan)
  *   3. A logged-in Codex CLI (~/.codex/auth.json) — zero-config ChatGPT
  */
 export async function loadConfig(opts: LoadConfigOptions = {}): Promise<GapsConfig> {
   const choice = opts.provider ?? "auto";
   const primary = await resolvePrimary(choice);
 
-  const architectModel =
-    process.env.WARROOM_ARCHITECT_MODEL ?? primary.model;
+  const architectModel = process.env.WARROOM_ARCHITECT_MODEL ?? primary.model;
   const agentModel = process.env.WARROOM_AGENT_MODEL ?? primary.model;
 
   const versus = opts.versus ? await resolveVersus(primary.provider) : null;
@@ -55,21 +58,30 @@ export async function loadConfig(opts: LoadConfigOptions = {}): Promise<GapsConf
   };
 }
 
+/** Resolve a single, concrete provider's credentials, or null if unavailable. */
+async function resolveProvider(provider: Provider): Promise<ResolvedProvider | null> {
+  switch (provider) {
+    case "anthropic":
+      return resolveAnthropic();
+    case "glm":
+      return resolveGlm();
+    case "codex":
+      return resolveCodex();
+  }
+}
+
 async function resolvePrimary(choice: ProviderChoice): Promise<ResolvedProvider> {
-  if (choice === "codex") {
-    const codex = await resolveCodex();
-    if (!codex) throw codexError();
-    return codex;
+  if (choice !== "auto") {
+    const resolved = await resolveProvider(choice);
+    if (!resolved) throw providerError(choice);
+    return resolved;
   }
 
-  if (choice === "anthropic") {
-    const anthropic = resolveAnthropic();
-    if (!anthropic) throw anthropicError();
-    return anthropic;
+  for (const provider of PROVIDER_ORDER) {
+    const resolved = await resolveProvider(provider);
+    if (resolved) return resolved;
   }
-
-  // auto: prefer an explicitly configured Anthropic key, then Codex CLI.
-  return resolveAnthropic() ?? (await resolveCodex()) ?? throwNoAuth();
+  throw noAuthError();
 }
 
 function resolveAnthropic(): ResolvedProvider | null {
@@ -85,6 +97,17 @@ function resolveAnthropic(): ResolvedProvider | null {
   };
 }
 
+function resolveGlm(): ResolvedProvider | null {
+  const glm = resolveGlmAuth();
+  if (!glm) return null;
+
+  return {
+    auth: { provider: "glm", method: "api-key", token: glm.token, baseUrl: glm.baseUrl },
+    provider: "glm",
+    model: glm.model,
+  };
+}
+
 async function resolveCodex(): Promise<ResolvedProvider | null> {
   if (!isCodexAvailable()) return null;
   const token = await resolveCodexAccessToken();
@@ -95,49 +118,43 @@ async function resolveCodex(): Promise<ResolvedProvider | null> {
   };
 }
 
-/** Build the opposing side for a cross-model debate. */
+/** Build the opposing side for a cross-model debate: the first other provider available. */
 async function resolveVersus(primary: Provider): Promise<VersusConfig> {
-  const opponentProvider: Provider = primary === "anthropic" ? "codex" : "anthropic";
-  const opponent =
-    opponentProvider === "codex" ? await resolveCodex() : resolveAnthropic();
-
-  if (!opponent) {
-    throw new Error(
-      `--versus needs both providers authenticated, but ${opponentProvider} is not available.\n` +
-        (opponentProvider === "codex"
-          ? "Log in with `codex login` or `warroom setup --codex-login`."
-          : "Set ANTHROPIC_API_KEY or run `warroom setup`."),
-    );
+  for (const provider of PROVIDER_ORDER) {
+    if (provider === primary) continue;
+    const opponent = await resolveProvider(provider);
+    if (opponent) {
+      return { auth: opponent.auth, model: opponent.model, roles: assignVersusRoles() };
+    }
   }
 
-  return {
-    auth: opponent.auth,
-    model: opponent.model,
-    roles: assignVersusRoles(),
-  };
+  throw new Error(
+    "--versus needs a second provider authenticated (Claude, Codex, or GLM).\n" +
+      "Add one: `codex login`, `warroom setup --codex-login`, " +
+      "`warroom setup --glm-key <key>`, or export ANTHROPIC_API_KEY / ZAI_API_KEY.",
+  );
 }
 
-function throwNoAuth(): never {
-  throw new Error(
+function noAuthError(): Error {
+  return new Error(
     "No authentication found. Set up with one of:\n\n" +
       "  1. warroom setup --token <token>   (paste from `claude setup-token`)\n" +
       "  2. warroom setup --login           (browser OAuth for Claude)\n" +
       "  3. warroom setup --codex-login     (ChatGPT / Codex login)\n" +
-      "  4. codex login                     (reuse the Codex CLI login)\n" +
-      "  5. export ANTHROPIC_API_KEY=...    (API key)\n\n" +
+      "  4. warroom setup --glm-key <key>   (Z.ai GLM coding plan)\n" +
+      "  5. codex login                     (reuse the Codex CLI login)\n" +
+      "  6. export ANTHROPIC_API_KEY=...    (Claude API key)\n" +
+      "  7. export ZAI_API_KEY=...          (Z.ai GLM key)\n\n" +
       "Run `warroom setup` for options.",
   );
 }
 
-function anthropicError(): Error {
-  return new Error(
-    "No Anthropic credentials found. Set ANTHROPIC_API_KEY, run `warroom setup`, " +
-      "or use `--provider codex`.",
-  );
-}
-
-function codexError(): Error {
-  return new Error(
-    "No Codex login found. Log in with `codex login` or run `warroom setup --codex-login`.",
-  );
+function providerError(provider: Provider): Error {
+  const hints: Record<Provider, string> = {
+    anthropic:
+      "Set ANTHROPIC_API_KEY, run `warroom setup`, or pick another provider.",
+    codex: "Log in with `codex login` or run `warroom setup --codex-login`.",
+    glm: "Set ZAI_API_KEY or run `warroom setup --glm-key <key>`.",
+  };
+  return new Error(`No ${provider} credentials found. ${hints[provider]}`);
 }

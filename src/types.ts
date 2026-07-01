@@ -43,13 +43,18 @@ export interface CodeChange {
 export type AuthMethod = "api-key" | "oauth-token" | "claude-credentials";
 
 /** Which model backend an agent talks to. */
-export type Provider = "anthropic" | "codex";
+export type Provider = "anthropic" | "codex" | "glm";
 
 export interface GapsAuth {
   /** Which backend this token is for. Defaults to "anthropic" when omitted. */
   provider?: Provider;
   method: AuthMethod;
   token: string;
+  /**
+   * Override the API endpoint. Used by Anthropic-compatible backends such as
+   * the Z.ai GLM coding plan (https://api.z.ai/api/anthropic).
+   */
+  baseUrl?: string;
 }
 
 /** How a single agent should be run: which credentials and which model. */

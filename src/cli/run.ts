@@ -30,6 +30,7 @@ export function formatStats(stats: ConversationStats, messages: readonly Convers
 const PROVIDER_LABEL: Record<Provider, string> = {
   anthropic: "Claude",
   codex: "GPT (Codex)",
+  glm: "GLM (Z.ai)",
 };
 
 export function bannerSubtitle(

@@ -95,4 +95,10 @@ describe("bannerSubtitle", () => {
     expect(out).toContain("GPT (Codex)");
     expect(out.toLowerCase()).toContain("vs");
   });
+
+  it("labels a GLM run", () => {
+    const out = bannerSubtitle("glm", null, "glm-5.2");
+    expect(out).toContain("GLM (Z.ai)");
+    expect(out).toContain("glm-5.2");
+  });
 });

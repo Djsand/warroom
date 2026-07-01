@@ -90,7 +90,15 @@ npx warroom run "Add user authentication with OAuth"
 ```
 
 The agents run on whatever model your Codex CLI is set to (from `~/.codex/config.toml`).
-Force a backend with `--provider codex` or `--provider anthropic`.
+
+**Using the [Z.ai GLM coding plan](https://z.ai/subscribe)?** Point warroom at GLM-5.2:
+
+```bash
+warroom setup --glm-key <your Z.ai API key>     # or: export ZAI_API_KEY=...
+warroom run "Add user authentication with OAuth" --provider glm
+```
+
+Force any backend with `--provider anthropic | glm | codex`.
 
 ---
 
@@ -157,8 +165,8 @@ The conversation is the product. Screenshot it. Share it. Learn from it.
 ## Cross-model debate ⚔️
 
 The whole premise of warroom is agents that *genuinely disagree*. Nothing
-disagrees with Claude quite like GPT. With `--versus`, warroom runs the debate
-across **two different labs' models at once**:
+disagrees with Claude quite like GPT — or GLM. With `--versus`, warroom runs the
+debate across **two different labs' models at once**:
 
 ```bash
 warroom run "Design a rate limiter" --versus
@@ -166,10 +174,11 @@ warroom run "Design a rate limiter" --versus
 
 By default the **adversaries** — the Challenger and the Breaker — argue on the
 opposing model, while the Architect, Builder, and Reviewer stay on your primary
-one. So Claude proposes and GPT attacks (or vice-versa), and the debate can't
-quietly collapse into one model agreeing with itself.
+one. So Claude proposes and GPT (or GLM) attacks, and the debate can't quietly
+collapse into one model agreeing with itself.
 
-Needs both providers authenticated. Tune which roles switch sides with
+Needs two providers authenticated; warroom pairs your primary with the first
+other one available (Claude, GLM, or Codex). Tune which roles switch sides with
 `WARROOM_VERSUS_ROLES` (e.g. `WARROOM_VERSUS_ROLES=architect,builder`).
 
 ---
@@ -178,12 +187,13 @@ Needs both providers authenticated. Tune which roles switch sides with
 
 ```
 warroom run <task>              Assign a task to the agent team
-warroom run <task> --provider   Pick a backend: anthropic | codex | auto
-warroom run <task> --versus     Cross-model debate (Claude vs GPT)
+warroom run <task> --provider   Pick a backend: anthropic | glm | codex | auto
+warroom run <task> --versus     Cross-model debate across two providers
 warroom setup                   Show auth status / options
 warroom setup --token <t>       Store a Claude setup token
 warroom setup --login           Browser OAuth login (Claude)
 warroom setup --codex-login     Browser OAuth login (ChatGPT / Codex)
+warroom setup --glm-key <key>   Store a Z.ai GLM coding-plan key
 warroom setup --reset           Clear stored Claude credentials
 warroom read                    Read the latest conversation
 warroom read --format html      Export as standalone HTML
@@ -195,8 +205,9 @@ warroom status                  List all conversations
 ## Auth (standalone only)
 
 The plugin mode needs no configuration. For the standalone CLI, warroom
-auto-detects credentials in this order: `ANTHROPIC_API_KEY` →
-`~/.warroom` (from `warroom setup`) → a logged-in **Codex CLI**.
+auto-detects credentials in this order: **Claude** (`ANTHROPIC_API_KEY` /
+`~/.warroom`) → **GLM** (`ZAI_API_KEY` / `~/.warroom/glm.json`) → a logged-in
+**Codex CLI**.
 
 ```bash
 # Claude — subscription (recommended)
@@ -204,6 +215,9 @@ warroom setup --token <paste from `claude setup-token`>
 
 # Claude — API key
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Z.ai GLM coding plan (GLM-5.2)
+warroom setup --glm-key <your Z.ai API key>   # or: export ZAI_API_KEY=...
 
 # ChatGPT / Codex — reuse an existing Codex CLI login (zero config)
 codex login
@@ -214,9 +228,10 @@ warroom setup --codex-login
 
 | Env var | Effect |
 |---------|--------|
-| `WARROOM_ARCHITECT_MODEL` / `WARROOM_AGENT_MODEL` | Override the models used |
+| `WARROOM_ARCHITECT_MODEL` / `WARROOM_AGENT_MODEL` | Override the models used (e.g. `glm-4.7` to save GLM quota) |
 | `WARROOM_CODEX_EFFORT` | Codex reasoning effort (`low`…`xhigh`, default `low`) |
 | `WARROOM_VERSUS_ROLES` | Which roles switch sides in `--versus` |
+| `ZAI_API_KEY` / `ZAI_BASE_URL` | Z.ai GLM key and (optional) endpoint override |
 
 ---
 

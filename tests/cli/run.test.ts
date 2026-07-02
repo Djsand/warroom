@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { formatStats } from "../../src/cli/run.js";
-import type { ConversationStats, ConversationMessage } from "../../src/types.js";
+import { formatStats, bannerSubtitle } from "../../src/cli/run.js";
+import type { ConversationStats, ConversationMessage, VersusConfig } from "../../src/types.js";
 
 function makeMessage(role: ConversationMessage["role"], phase: ConversationMessage["phase"]): ConversationMessage {
   return { role, content: "test", phase, timestamp: new Date() };
@@ -74,5 +74,31 @@ describe("formatStats", () => {
     const output = formatStats(stats, messages);
 
     expect(output).toContain("2s");
+  });
+});
+
+describe("bannerSubtitle", () => {
+  it("names the provider and model for a single-provider run", () => {
+    expect(bannerSubtitle("codex", null, "gpt-5.5")).toContain("GPT (Codex)");
+    expect(bannerSubtitle("codex", null, "gpt-5.5")).toContain("gpt-5.5");
+    expect(bannerSubtitle("anthropic", null, "claude-sonnet-4-6")).toContain("Claude");
+  });
+
+  it("announces both sides for a cross-model debate", () => {
+    const versus: VersusConfig = {
+      auth: { provider: "codex", method: "oauth-token", token: "t" },
+      model: "gpt-5.5",
+      roles: ["challenger", "breaker"],
+    };
+    const out = bannerSubtitle("anthropic", versus, "claude-sonnet-4-6");
+    expect(out).toContain("Claude");
+    expect(out).toContain("GPT (Codex)");
+    expect(out.toLowerCase()).toContain("vs");
+  });
+
+  it("labels a GLM run", () => {
+    const out = bannerSubtitle("glm", null, "glm-5.2");
+    expect(out).toContain("GLM (Z.ai)");
+    expect(out).toContain("glm-5.2");
   });
 });

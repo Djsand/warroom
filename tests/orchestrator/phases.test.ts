@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { runDesignPhase } from "../../src/orchestrator/phases.js";
+import { runDesignPhase, agentFor, type PhaseConfig } from "../../src/orchestrator/phases.js";
 import { Thread } from "../../src/conversation/thread.js";
+import type { GapsAuth } from "../../src/types.js";
 
 vi.mock("../../src/agents/call.js", () => ({
   callAgent: vi.fn()
@@ -41,5 +42,36 @@ describe("runDesignPhase", () => {
     expect(messages.length).toBeGreaterThanOrEqual(2);
     expect(messages.some((m) => m.role === "architect")).toBe(true);
     expect(messages.some((m) => m.role === "challenger")).toBe(true);
+  });
+});
+
+describe("agentFor", () => {
+  const anthropic: GapsAuth = { provider: "anthropic", method: "api-key", token: "claude" };
+  const codex: GapsAuth = { provider: "codex", method: "oauth-token", token: "gpt" };
+
+  const base: PhaseConfig = {
+    auth: anthropic,
+    architectModel: "claude-arch",
+    agentModel: "claude-agent",
+    maxRounds: 4,
+    projectContext: "",
+    versus: { auth: codex, model: "gpt-5.5", roles: ["challenger", "breaker"] },
+  };
+
+  it("routes opposing roles to the versus provider/model", () => {
+    expect(agentFor("challenger", base)).toEqual({ auth: codex, model: "gpt-5.5" });
+    expect(agentFor("breaker", base)).toEqual({ auth: codex, model: "gpt-5.5" });
+  });
+
+  it("keeps the remaining roles on the primary provider", () => {
+    expect(agentFor("architect", base)).toEqual({ auth: anthropic, model: "claude-arch" });
+    expect(agentFor("builder", base)).toEqual({ auth: anthropic, model: "claude-agent" });
+    expect(agentFor("reviewer", base)).toEqual({ auth: anthropic, model: "claude-agent" });
+  });
+
+  it("uses one provider for everyone when versus is off", () => {
+    const single: PhaseConfig = { ...base, versus: null };
+    expect(agentFor("challenger", single)).toEqual({ auth: anthropic, model: "claude-agent" });
+    expect(agentFor("architect", single)).toEqual({ auth: anthropic, model: "claude-arch" });
   });
 });

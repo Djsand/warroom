@@ -1,33 +1,38 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AgentRole, CodeChange, GapsAuth } from "../types.js";
+import {
+  extractCodeChanges,
+  type CallAgentInput,
+  type CallAgentResult,
+} from "./shared.js";
+import { callCodexAgent } from "./codex-provider.js";
 
-export interface CallAgentInput {
-  role: AgentRole;
-  systemPrompt: string;
-  conversationContext: string;
-  auth: GapsAuth;
-  model: string;
-}
-
-export interface CallAgentResult {
-  content: string;
-  codeChanges: CodeChange[];
-  tokensUsed: number;
-}
+export type { CallAgentInput, CallAgentResult } from "./shared.js";
 
 function isOAuthToken(token: string): boolean {
   return token.includes("sk-ant-oat");
 }
 
 export async function callAgent(input: CallAgentInput): Promise<CallAgentResult> {
+  if (input.auth.provider === "codex") {
+    return callCodexAgent(input);
+  }
+  return callAnthropicAgent(input);
+}
+
+async function callAnthropicAgent(input: CallAgentInput): Promise<CallAgentResult> {
+  const isOAuth = isOAuthToken(input.auth.token);
+  const isGlm = input.auth.provider === "glm";
+  const baseURL = input.auth.baseUrl;
+
   let client: Anthropic;
 
-  if (isOAuthToken(input.auth.token)) {
-    // OAuth tokens need Bearer auth + Claude Code identity headers
+  if (isOAuth) {
+    // Anthropic OAuth tokens need Bearer auth + Claude Code identity headers
     // (same approach as OpenClaw / pi-ai)
     client = new Anthropic({
       apiKey: null,
       authToken: input.auth.token,
+      ...(baseURL ? { baseURL } : {}),
       defaultHeaders: {
         "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14",
         "user-agent": "claude-cli/2.1.75",
@@ -35,13 +40,17 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
         "accept": "application/json",
       },
     });
+  } else if (isGlm) {
+    // Z.ai GLM: Anthropic-compatible endpoint, key sent as a Bearer token.
+    client = new Anthropic({ authToken: input.auth.token, baseURL });
   } else {
-    // Standard API key
-    client = new Anthropic({ apiKey: input.auth.token });
+    // Standard Anthropic API key (x-api-key), optionally against a custom base.
+    client = new Anthropic({ apiKey: input.auth.token, ...(baseURL ? { baseURL } : {}) });
   }
 
-  // OAuth requires Claude Code identity in system prompt (array format)
-  const system = isOAuthToken(input.auth.token)
+  // Anthropic OAuth requires Claude Code identity in the system prompt; GLM and
+  // plain API keys do not.
+  const system = isOAuth
     ? [
         { type: "text" as const, text: "You are Claude Code, Anthropic's official CLI for Claude." },
         { type: "text" as const, text: input.systemPrompt },
@@ -65,18 +74,4 @@ export async function callAgent(input: CallAgentInput): Promise<CallAgentResult>
     (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
 
   return { content: textContent, codeChanges, tokensUsed };
-}
-
-function extractCodeChanges(text: string): CodeChange[] {
-  const changes: CodeChange[] = [];
-  const fileBlockRegex = /FILE:\s*([\w/.\\-]+)\s*\n```[\w]*\n([\s\S]*?)```/g;
-  let match;
-  while ((match = fileBlockRegex.exec(text)) !== null) {
-    changes.push({
-      filePath: match[1].trim(),
-      content: match[2].trim(),
-      action: "create",
-    });
-  }
-  return changes;
 }

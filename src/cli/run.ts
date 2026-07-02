@@ -2,9 +2,14 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { runGaps, slugify, formatDate } from "../orchestrator/run.js";
-import { loadConfig } from "../config.js";
-import type { ConversationStats, ConversationMessage } from "../types.js";
+import { loadConfig, type ProviderChoice } from "../config.js";
+import type { ConversationStats, ConversationMessage, Provider, VersusConfig } from "../types.js";
 import { banner, missionComplete, statsLine, fileLine } from "./ui.js";
+
+export interface RunOptions {
+  provider?: ProviderChoice;
+  versus?: boolean;
+}
 
 export function formatStats(stats: ConversationStats, messages: readonly ConversationMessage[]): string {
   const agentCount = new Set(messages.map((m) => m.role)).size;
@@ -22,8 +27,26 @@ export function formatStats(stats: ConversationStats, messages: readonly Convers
   return statsLine(parts);
 }
 
-export async function handleRun(task: string): Promise<void> {
-  const config = loadConfig();
+const PROVIDER_LABEL: Record<Provider, string> = {
+  anthropic: "Claude",
+  codex: "GPT (Codex)",
+  glm: "GLM (Z.ai)",
+};
+
+export function bannerSubtitle(
+  provider: Provider,
+  versus: VersusConfig | null | undefined,
+  model: string,
+): string {
+  if (versus) {
+    const opponent = provider === "anthropic" ? PROVIDER_LABEL.codex : PROVIDER_LABEL.anthropic;
+    return `Cross-model debate: ${PROVIDER_LABEL[provider]} vs ${opponent}.`;
+  }
+  return `5 agents on ${PROVIDER_LABEL[provider]} (${model}).`;
+}
+
+export async function handleRun(task: string, options: RunOptions = {}): Promise<void> {
+  const config = await loadConfig({ provider: options.provider, versus: options.versus });
   const projectDir = process.cwd();
 
   // Read package.json for basic project context if it exists
@@ -50,7 +73,7 @@ export async function handleRun(task: string): Promise<void> {
     }
   }
 
-  console.log(banner());
+  console.log(banner(bannerSubtitle(config.provider, config.versus, config.agentModel)));
   console.log(`  ${chalk.bold("Task:")} ${task}`);
   console.log("");
 
@@ -63,6 +86,7 @@ export async function handleRun(task: string): Promise<void> {
     agentModel: config.agentModel,
     maxDesignRounds: config.maxDesignRounds,
     maxReviewRounds: config.maxReviewRounds,
+    versus: config.versus,
   });
 
   // Write conversation.md and summary.md

@@ -31,17 +31,24 @@ export function phaseHeader(name: string): string {
   return `\n  ${line}\n  ${chalk.bold.white(name)}\n  ${line}`;
 }
 
-export function waitingFor(role: AgentRole): string {
-  return `  ${chalk.dim("\u25CB")} Waiting for ${agentName(role)}${chalk.dim("...")}`;
+/** A dim \u27E8model\u27E9 marker, shown next to agents in cross-model debates. */
+export function modelTag(label: string): string {
+  return chalk.dim(`\u27E8${label}\u27E9`);
 }
 
-export function doneAgent(role: AgentRole, content: string): string {
-  return `  ${chalk.white("\u25CF")} ${agentTag(role)} ${chalk.bold(AGENT_LABEL[role])}  ${chalk.dim(content.replace(/\n/g, " ").slice(0, 60))}${content.length > 60 ? chalk.dim("...") : ""}`;
+export function waitingFor(role: AgentRole, tag?: string): string {
+  const suffix = tag ? ` ${modelTag(tag)}` : "";
+  return `  ${chalk.dim("\u25CB")} Waiting for ${agentName(role)}${suffix}${chalk.dim("...")}`;
 }
 
-export function banner(): string {
+export function doneAgent(role: AgentRole, content: string, tag?: string): string {
+  const suffix = tag ? ` ${modelTag(tag)}` : "";
+  return `  ${chalk.white("\u25CF")} ${agentTag(role)} ${chalk.bold(AGENT_LABEL[role])}${suffix}  ${chalk.dim(content.replace(/\n/g, " ").slice(0, 60))}${content.length > 60 ? chalk.dim("...") : ""}`;
+}
+
+export function banner(subtitle?: string): string {
   const title = chalk.bold.white("warroom");
-  const sub = chalk.dim("5 agents. 1 task. Let the debate begin.");
+  const sub = chalk.dim(subtitle ?? "5 agents. 1 task. Let the debate begin.");
   return `\n  ${title}\n  ${sub}\n`;
 }
 

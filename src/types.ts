@@ -42,18 +42,50 @@ export interface CodeChange {
 
 export type AuthMethod = "api-key" | "oauth-token" | "claude-credentials";
 
+/** Which model backend an agent talks to. */
+export type Provider = "anthropic" | "codex" | "glm";
+
 export interface GapsAuth {
+  /** Which backend this token is for. Defaults to "anthropic" when omitted. */
+  provider?: Provider;
   method: AuthMethod;
   token: string;
+  /**
+   * Override the API endpoint. Used by Anthropic-compatible backends such as
+   * the Z.ai GLM coding plan (https://api.z.ai/api/anthropic).
+   */
+  baseUrl?: string;
+}
+
+/** How a single agent should be run: which credentials and which model. */
+export interface AgentAssignment {
+  auth: GapsAuth;
+  model: string;
 }
 
 export interface GapsConfig {
   auth: GapsAuth;
+  provider: Provider;
   architectModel: string;
   agentModel: string;
   maxDesignRounds: number;
   maxReviewRounds: number;
   outputDir: string;
+  /**
+   * Optional cross-model debate. When set, the listed roles run on a second
+   * provider/model while the rest run on the primary one — Claude vs GPT in
+   * the same war room.
+   */
+  versus?: VersusConfig | null;
+}
+
+export interface VersusConfig {
+  /** Credentials for the opposing side. */
+  auth: GapsAuth;
+  /** Model the opposing side argues with. */
+  model: string;
+  /** Roles that switch to the opposing side. */
+  roles: AgentRole[];
 }
 
 export interface GapsResult {

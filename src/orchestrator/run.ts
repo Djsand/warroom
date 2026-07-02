@@ -1,4 +1,4 @@
-import type { GapsResult, GapsAuth } from "../types.js";
+import type { GapsResult, GapsAuth, VersusConfig } from "../types.js";
 import { Thread } from "../conversation/thread.js";
 import { renderConversation } from "../conversation/renderer.js";
 import { renderSummary } from "../conversation/summary.js";
@@ -14,6 +14,7 @@ export interface RunGapsInput {
   agentModel?: string;
   maxDesignRounds?: number;
   maxReviewRounds?: number;
+  versus?: VersusConfig | null;
 }
 
 export interface RunGapsOutput extends GapsResult {
@@ -46,6 +47,7 @@ export async function runGaps(input: RunGapsInput): Promise<RunGapsOutput> {
     agentModel = "claude-sonnet-4-6-20250514",
     maxDesignRounds = 4,
     maxReviewRounds = 2,
+    versus = null,
   } = input;
 
   const thread = new Thread(task);
@@ -59,6 +61,7 @@ export async function runGaps(input: RunGapsInput): Promise<RunGapsOutput> {
     agentModel,
     maxRounds: maxDesignRounds,
     projectContext,
+    versus,
   };
 
   // Phase 1: Design
